@@ -6,6 +6,8 @@
 #include "Form/Button.hpp"
 #include "Form/HLine.hpp"
 #include "Look/DialogLook.hpp"
+#include "Look/LXLook.hpp"
+#include "Form/LXFieldGeometry.hpp"
 #include "Dialogs/DialogSettings.hpp"
 #include "UIGlobals.hpp"
 #include "Screen/Layout.hpp"
@@ -20,6 +22,11 @@ static unsigned
 GetMinimumHeight(const WndProperty &control, const DialogLook &look,
                  bool vertical) noexcept
 {
+  if (look.lx)
+    return LX::FieldGeometry::FromLook().GetHeight(
+      vertical && control.HasCaption() && !control.IsCheckBox(),
+      look.small_font.GetHeight(), Layout::GetMinimumControlHeight());
+
   const unsigned padding = Layout::GetTextPadding();
   unsigned height = look.text_font.GetHeight();
   if (vertical && control.HasCaption())
@@ -38,6 +45,9 @@ GetMaximumHeight(const WndProperty &control, const DialogLook &look,
                  bool vertical) noexcept
 {
   unsigned height = GetMinimumHeight(control, look, vertical);
+  if (look.lx)
+    return height;
+
   if (!control.IsReadOnly() && height < Layout::GetMaximumControlHeight())
     height = Layout::GetMaximumControlHeight();
 
@@ -109,6 +119,48 @@ RowFormWidget::Row::GetMaximumHeight(const DialogLook &look,
   }
 
   return window->GetPosition().GetHeight();
+}
+
+/**
+ * Does a value of this type fit into a column?  Text, files and
+ * coordinates are too long for that.
+ */
+[[gnu::const]]
+static bool
+IsShortValue(DataField::Type type) noexcept
+{
+  switch (type) {
+  case DataField::Type::BOOLEAN:
+  case DataField::Type::INTEGER:
+  case DataField::Type::REAL:
+  case DataField::Type::ANGLE:
+  case DataField::Type::ENUM:
+  case DataField::Type::ROUGH_TIME:
+  case DataField::Type::TIME:
+  case DataField::Type::PREFIX:
+  case DataField::Type::DATE:
+    return true;
+
+  case DataField::Type::STRING:
+  case DataField::Type::FILE:
+  case DataField::Type::MULTI_FILE:
+  case DataField::Type::GEOPOINT:
+    break;
+  }
+
+  return false;
+}
+
+bool
+RowFormWidget::Row::IsShareable() const noexcept
+{
+  if (type != Type::EDIT)
+    return false;
+
+  const WndProperty &control = GetControl();
+  const DataField *data_field = control.GetDataField();
+  return control.HasCaption() && data_field != nullptr &&
+    IsShortValue(data_field->GetType());
 }
 
 inline void
@@ -350,66 +402,180 @@ RowFormWidget::GetRecommendedCaptionWidth() const noexcept
   return w;
 }
 
+struct RowFormWidget::Plan {
+  struct Line {
+    unsigned min_height = 0, max_height = 0;
+
+    /** Does the line grow when there is excess screen space? */
+    bool elastic = false;
+  };
+
+  unsigned columns = 1;
+
+  /** The space left and right of the rows, and between columns. */
+  unsigned margin = 0, gap = 0;
+
+  /** One entry per row; a row which is not available spans no column. */
+  boost::container::static_vector<RowFlow::Slot, 32u> slots;
+
+  /**
+   * One entry per row: the width reserved for its caption, or
+   * negative if the caption is above the value.
+   */
+  boost::container::static_vector<int, 32u> caption_widths;
+
+  boost::container::static_vector<Line, 32u> lines;
+
+  unsigned GetMinimumHeight() const noexcept {
+    unsigned height = 0;
+    for (const auto &line : lines)
+      height += line.min_height;
+    return height;
+  }
+
+  unsigned GetMaximumHeight() const noexcept {
+    unsigned height = 0;
+    for (const auto &line : lines)
+      height += line.max_height;
+    return height;
+  }
+};
+
+RowFormWidget::Plan
+RowFormWidget::MakePlan(unsigned width) const noexcept
+{
+  const bool expert = UIGlobals::GetDialogSettings().expert;
+
+  Plan plan;
+  if (look.lx) {
+    plan.margin = LX::Scale(LX::Form::MARGIN);
+    plan.gap = LX::Scale(LX::Form::COLUMN_GAP);
+
+    /* side by side captions need the space above the value, and
+       a form that asks for them keeps them there */
+    if (!vertical)
+      plan.columns = RowFlow::CountColumns(width, plan.margin, plan.gap,
+                                           LX::Scale(LX::Form::MIN_CELL_WIDTH));
+  }
+
+  /* put the available rows into lines */
+  boost::container::static_vector<bool, 32u> shareable;
+  for (const auto &row : rows)
+    if (row.IsAvailable(expert))
+      shareable.push_back(plan.columns > 1 && row.IsShareable());
+
+  boost::container::static_vector<RowFlow::Slot, 32u> assigned(shareable.size());
+  const unsigned n_lines = RowFlow::Assign(shareable, plan.columns, assigned);
+  plan.lines.resize(n_lines);
+
+  auto next = assigned.begin();
+  for (const auto &row : rows) {
+    if (!row.IsAvailable(expert)) {
+      plan.slots.push_back({0, 0, 0});
+      continue;
+    }
+
+    const RowFlow::Slot slot = *next++;
+    plan.slots.push_back(slot);
+
+    /* the rows of a shared line have the caption above the value */
+    const bool caption_above = vertical || slot.span < plan.columns;
+    auto &line = plan.lines[slot.line];
+    line.min_height = std::max(line.min_height,
+                               row.GetMinimumHeight(look, caption_above));
+    line.max_height = std::max(line.max_height,
+                               row.GetMaximumHeight(look, caption_above));
+    line.elastic |= row.IsElastic(look, caption_above);
+  }
+
+  /* The captions left of the values are as wide as the widest one.
+     The LX look gives the values of short rows a column of their
+     own, as wide as on the LX9000. */
+  int short_caption_width = -1, wide_caption_width = -1;
+  if (!vertical) {
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      const Row &row = rows[i];
+      if (row.type != Row::Type::EDIT || plan.slots[i].span < plan.columns ||
+          !row.IsAvailable(expert))
+        continue;
+
+      const int cw = row.GetControl().GetRecommendedCaptionWidth();
+      int &widest = look.lx && row.IsShareable()
+        ? short_caption_width
+        : wide_caption_width;
+      widest = std::max(widest, cw);
+    }
+
+    if (short_caption_width >= 0)
+      short_caption_width = std::max<int>(short_caption_width,
+                                          int(width) - 2 * int(plan.margin)
+                                          - int(LX::Scale(LX::Form::VALUE_COLUMN_WIDTH)));
+
+    for (int *cw : {&short_caption_width, &wide_caption_width})
+      if (*cw * 3 > int(width * 2))
+        *cw = width * 2 / 3;
+  }
+
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    const Row &row = rows[i];
+    int cw = -1;
+    if (!vertical && plan.slots[i].span == plan.columns)
+      cw = look.lx && row.IsShareable()
+        ? short_caption_width
+        : wide_caption_width;
+
+    plan.caption_widths.push_back(cw);
+  }
+
+  return plan;
+}
+
+unsigned
+RowFormWidget::GetCurrentWidth() const noexcept
+{
+  return IsDefined() ? GetWindow().GetClientRect().GetWidth() : 0u;
+}
+
 void
 RowFormWidget::UpdateLayout() noexcept
 {
-  PixelRect current_rect = GetWindow().GetClientRect();
-  const unsigned total_width = current_rect.GetWidth();
-  const unsigned total_height = current_rect.GetHeight();
-  current_rect.bottom = current_rect.top;
+  const PixelRect client_rect = GetWindow().GetClientRect();
+  const unsigned total_width = client_rect.GetWidth();
+  const unsigned total_height = client_rect.GetHeight();
 
   const bool expert = UIGlobals::GetDialogSettings().expert;
 
-  /* first row traversal: count the number of "elastic" rows and
-     determine the minimum total height */
-  unsigned min_height = 0;
+  const Plan plan = MakePlan(total_width);
+
+  /* count the number of "elastic" lines and determine the minimum
+     total height */
+  const unsigned min_height = plan.GetMinimumHeight();
   unsigned n_elastic = 0;
-  int caption_width = -1;
-
-  for (const auto &i : rows) {
-    if (!i.IsAvailable(expert))
-      continue;
-
-    min_height += i.GetMinimumHeight(look, vertical);
-    if (i.IsElastic(look, vertical))
+  for (const auto &line : plan.lines)
+    if (line.elastic)
       ++n_elastic;
-
-    if (!vertical && i.type == Row::Type::EDIT) {
-      int cw = i.GetControl().GetRecommendedCaptionWidth();
-      if (cw > caption_width)
-        caption_width = cw;
-    }
-  }
-
-  if (caption_width * 3 > int(total_width * 2))
-    caption_width = total_width * 2 / 3;
 
   /* how much excess height in addition to the minimum height? */
   unsigned excess_height = min_height < total_height
     ? total_height - min_height
     : 0;
 
-  /* second row traversal: now move and resize the rows */
-  for (auto &i : rows) {
-    if (!i.IsAvailable(expert)) {
-      i.Hide();
-      continue;
-    }
-
-    /* determine this row's height */
-    unsigned height = i.GetMinimumHeight(look, vertical);
-    if (excess_height > 0 && i.IsElastic(look, vertical)) {
+  /* determine the lines' vertical extent */
+  boost::container::static_vector<int, 33u> line_tops;
+  line_tops.push_back(client_rect.top);
+  for (const auto &line : plan.lines) {
+    unsigned height = line.min_height;
+    if (excess_height > 0 && line.elastic) {
       assert(n_elastic > 0);
 
-      /* distribute excess height among all elastic rows */
+      /* distribute excess height among all elastic lines */
       unsigned grow_height = excess_height / n_elastic;
       if (grow_height > 0) {
         height += grow_height;
-        const unsigned max_height = i.GetMaximumHeight(look, vertical);
-        if (height > max_height) {
+        if (height > line.max_height) {
           /* never grow beyond declared maximum height */
-          grow_height = max_height - height + grow_height;
-          height = max_height;
+          grow_height = line.max_height - height + grow_height;
+          height = line.max_height;
         }
 
         excess_height -= grow_height;
@@ -418,12 +584,29 @@ RowFormWidget::UpdateLayout() noexcept
       --n_elastic;
     }
 
-    NextControlRect(current_rect, height);
-    i.UpdateLayout((ContainerWindow &)GetWindow(), current_rect,
-                   caption_width);
+    /* a row is at least one pixel high */
+    line_tops.push_back(line_tops.back() + std::max(height, 1u));
   }
 
   assert(excess_height == 0 || n_elastic == 0);
+
+  /* now move and resize the rows */
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    Row &row = rows[i];
+    if (!row.IsAvailable(expert)) {
+      row.Hide();
+      continue;
+    }
+
+    const RowFlow::Slot &slot = plan.slots[i];
+    const auto extent = RowFlow::GetExtent(slot, plan.columns, total_width,
+                                           plan.margin, plan.gap);
+    const PixelRect rc{client_rect.left + extent.left, line_tops[slot.line],
+                       client_rect.left + extent.right,
+                       line_tops[slot.line + 1]};
+    row.UpdateLayout((ContainerWindow &)GetWindow(), rc,
+                     plan.caption_widths[i]);
+  }
 }
 
 PixelSize
@@ -438,14 +621,9 @@ RowFormWidget::GetMinimumSize() const noexcept
     ? std::max(GetRecommendedCaptionWidth(), value_width)
     : (GetRecommendedCaptionWidth() + value_width);
 
-  PixelSize size(edit_width, 0u);
+  PixelSize size(edit_width, MakePlan(GetCurrentWidth()).GetMinimumHeight());
   for (const auto &i : rows) {
-    if (!i.IsAvailable(expert))
-      continue;
-
-    size.height += i.GetMinimumHeight(look, vertical);
-
-    if (i.type == Row::Type::WIDGET) {
+    if (i.IsAvailable(expert) && i.type == Row::Type::WIDGET) {
       const unsigned width = i.widget->GetMinimumSize().width;
       if (width > size.width)
         size.width = width;
@@ -467,14 +645,9 @@ RowFormWidget::GetMaximumSize() const noexcept
     ? std::max(GetRecommendedCaptionWidth(), value_width)
     : (GetRecommendedCaptionWidth() + value_width);
 
-  PixelSize size(edit_width, 0u);
+  PixelSize size(edit_width, MakePlan(GetCurrentWidth()).GetMaximumHeight());
   for (const auto &i : rows) {
-    if (!i.IsAvailable(expert))
-      continue;
-
-    size.height += i.GetMaximumHeight(look, vertical);
-
-    if (i.type == Row::Type::WIDGET) {
+    if (i.IsAvailable(expert) && i.type == Row::Type::WIDGET) {
       const unsigned width = i.widget->GetMaximumSize().width;
       if (width > size.width)
         size.width = width;

@@ -8,6 +8,7 @@
 #include "Repository/FileType.hpp"
 #include "Units/Group.hpp"
 #include "WindowWidget.hpp"
+#include "RowFlow.hpp"
 #include "time/BrokenDate.hpp"
 #include "time/FloatDuration.hxx"
 #include "time/RoughTimeDecl.hpp"
@@ -224,6 +225,14 @@ class RowFormWidget : public WindowWidget {
     }
 
     /**
+     * May this row share its line with another row in a form with
+     * several columns?  True for a captioned control with a short
+     * value; false for text, files, buttons and everything wide.
+     */
+    [[gnu::pure]]
+    bool IsShareable() const noexcept;
+
+    /**
      * Will this row grow when there is excess screen space?
      */
     bool IsElastic(const DialogLook &look, bool vertical) const noexcept {
@@ -267,6 +276,12 @@ class RowFormWidget : public WindowWidget {
   const bool vertical;
 
   boost::container::static_vector<Row, 32u> rows;
+
+  /**
+   * How the rows are arranged for a certain width: in how many
+   * columns, which row is in which line, and how high each line is.
+   */
+  struct Plan;
 
 public:
   RowFormWidget(const DialogLook &look, bool vertical=false) noexcept;
@@ -809,6 +824,18 @@ protected:
     rc.bottom = rc.top + height;
     return rc;
   }
+
+  /**
+   * Arrange the available rows in a form of the given width.
+   */
+  [[gnu::pure]]
+  Plan MakePlan(unsigned width) const noexcept;
+
+  /**
+   * The width of the form, or zero if it has no window yet.
+   */
+  [[gnu::pure]]
+  unsigned GetCurrentWidth() const noexcept;
 
   /**
    * Recalculate all button positions.

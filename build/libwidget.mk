@@ -18,6 +18,7 @@ WIDGET_SOURCES = \
 	$(SRC)/Widget/RichTextWidget.cpp \
 	$(SRC)/Widget/OverlappedWidget.cpp \
 	$(SRC)/Widget/TwoWidgets.cpp \
+	$(SRC)/Widget/RowFlow.cpp \
 	$(SRC)/Widget/RowFormWidget.cpp \
 	$(SRC)/Widget/FileRowFormWidget.cpp \
 	$(SRC)/Widget/EditRowFormWidget.cpp \
