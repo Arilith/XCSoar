@@ -76,8 +76,8 @@ DialogLook::Initialise(bool _dark_mode)
     list.selected.text_color = COLOR_WHITE;
     list.focused.background_color = COLOR_XCSOAR_DARK;
     list.focused.text_color = COLOR_WHITE;
-    list.pressed.background_color = DarkColor(COLOR_YELLOW);
-    list.pressed.text_color = COLOR_WHITE;
+    list.pressed.background_color = COLOR_YELLOW;
+    list.pressed.text_color = COLOR_BLACK;
   } else {
     caption.text_color = COLOR_BLACK;
     caption.background_color = IsDithered() ? COLOR_BLACK : COLOR_XCSOAR_DARK;

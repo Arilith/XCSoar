@@ -9,12 +9,40 @@
 #include "Form/Button.hpp"
 #include "ui/event/KeyCode.hpp"
 #include "ui/canvas/Canvas.hpp"
+#include "ui/canvas/Icon.hpp"
 #include "Look/DialogLook.hpp"
 #include "Language/Language.hpp"
 #include "util/StringFormat.hpp"
 #include "Asset.hpp"
 
+#include <algorithm>
 #include <cassert>
+
+void
+TabMenuDisplay::MainMenuButton::Draw(Canvas &canvas, const DialogLook &look,
+                                     bool focused, bool pressed,
+                                     bool selected) const noexcept
+{
+  canvas.DrawFilledRectangle(rc,
+                             look.list.GetBackgroundColor(selected, focused,
+                                                          pressed));
+  canvas.SetTextColor(look.list.GetTextColor(selected, focused, pressed));
+  canvas.SetBackgroundTransparent();
+  canvas.Select(*look.button.font);
+
+  const unsigned padding = Layout::GetTextPadding();
+  const unsigned icon_height = std::min(rc.GetHeight() / 2,
+                                        look.button.font->GetHeight());
+  const int icon_x = rc.left + padding + icon_height / 2;
+  if (icon != nullptr && icon_height > 0)
+    icon->Draw(canvas, {icon_x, (rc.top + rc.bottom) / 2}, icon_height);
+
+  const int text_x = icon != nullptr
+    ? icon_x + int(icon_height / 2 + padding) : rc.left + int(padding);
+  const int width = std::max(0, rc.right - text_x - int(padding));
+  const int y = (rc.top + rc.bottom - int(canvas.GetFontHeight())) / 2;
+  canvas.DrawClippedText({text_x, y}, width, caption);
+}
 
 TabMenuDisplay::TabMenuDisplay(PagerWidget &_pager,
                                const DialogLook &_look) noexcept
@@ -88,63 +116,52 @@ TabMenuDisplay::GetPageNum(MenuTabIndex i) const noexcept
 static unsigned
 GetTabLineHeight() noexcept
 {
-  return Layout::Scale(1);
+  return Layout::Scale(2);
 }
 
 void
 TabMenuDisplay::UpdateLayout() noexcept
 {
   const auto window_size = GetSize();
-  const unsigned border_width = GetTabLineHeight();
-  const unsigned n_main_menu_items = std::max(GetNumMainMenuItems(), 1u);
+  const unsigned gap = GetTabLineHeight();
+  const unsigned min_width = Layout::GetMinimumControlHeight() * 3;
+  main_columns = window_size.width >= min_width * 3 ? 3 : 2;
+  sub_columns = window_size.width >= min_width * 2 ? 2 : 1;
+  const unsigned main_rows = (GetNumMainMenuItems() + main_columns - 1) /
+    main_columns;
+  unsigned max_sub_rows = 1;
+  for (const auto &main : main_menu_buttons)
+    max_sub_rows = std::max(max_sub_rows,
+                            (main.NumSubMenus() + sub_columns - 1) /
+                            sub_columns);
 
-  unsigned n_vertical_items = n_main_menu_items;
-  for (unsigned i = 0; i < GetNumMainMenuItems(); ++i)
-    n_vertical_items = std::max(n_vertical_items,
-                                GetMainMenuButton(i).NumSubMenus());
+  const unsigned rows = main_rows + max_sub_rows;
+  const unsigned spacing = gap * (rows + 1);
+  const unsigned available = window_size.height > spacing
+    ? window_size.height - spacing : window_size.height;
+  const unsigned height = std::max(1u,
+    std::min(Layout::GetMaximumControlHeight(), available / rows));
+  const unsigned main_width = window_size.width / main_columns;
+  const unsigned sub_width = window_size.width / sub_columns;
+  const unsigned sub_top = gap + main_rows * (height + gap) + gap;
 
-  const unsigned offset = Layout::Scale(2);
-  const unsigned vertical_spacing =
-    (n_vertical_items + 1) * border_width + 2 * offset;
-  const unsigned available_height = window_size.height > vertical_spacing
-    ? window_size.height - vertical_spacing
-    : window_size.height;
-  const unsigned menu_button_height =
-    std::min(Layout::GetMaximumControlHeight(),
-             available_height / n_vertical_items);
-  const unsigned menu_button_width = (window_size.width - 2 * border_width) / 2;
-
-  const unsigned item_height = menu_button_height + border_width;
-
-  for (unsigned main_i = 0, main_y = border_width;
-       main_i < main_menu_buttons.size(); ++main_i) {
+  for (unsigned main_i = 0; main_i < main_menu_buttons.size(); ++main_i) {
     MainMenuButton &main = main_menu_buttons[main_i];
-    main.rc.left = 0;
-    main.rc.right = menu_button_width;
-    main.rc.top = main_y;
-    main.rc.bottom = main.rc.top + menu_button_height;
-    main_y = main.rc.bottom + border_width;
-
+    const unsigned column = main_i % main_columns;
+    const unsigned row = main_i / main_columns;
+    main.rc.left = column * main_width + gap;
+    main.rc.right = (column + 1) * main_width - gap;
+    main.rc.top = gap + row * (height + gap);
+    main.rc.bottom = main.rc.top + height;
     main.renderer.InvalidateLayout();
-
-    const unsigned group_height =
-      item_height * main.NumSubMenus() + border_width;
-
-    unsigned page_y = main.rc.top + offset;
-    if (page_y + group_height > window_size.height)
-      page_y = window_size.height - group_height - offset;
-
     for (unsigned page_i = main.first_page_index;
          page_i <= main.last_page_index; ++page_i) {
       SubMenuButton &page = buttons[page_i];
-
-      page.rc.left = menu_button_width + border_width;
-      page.rc.right = page.rc.left + menu_button_width;
-
-      page.rc.top = page_y;
-      page.rc.bottom = page.rc.top + menu_button_height;
-      page_y = page.rc.bottom + border_width;
-
+      const unsigned i = page_i - main.first_page_index;
+      page.rc.left = (i % sub_columns) * sub_width + gap;
+      page.rc.right = (i % sub_columns + 1) * sub_width - gap;
+      page.rc.top = sub_top + (i / sub_columns) * (height + gap);
+      page.rc.bottom = page.rc.top + height;
       page.renderer.InvalidateLayout();
     }
   }
@@ -187,8 +204,10 @@ void
 TabMenuDisplay::OnPageFlipped() noexcept
 {
   const unsigned i = pager.GetCurrentIndex();
-  if (i >= PAGE_OFFSET)
+  if (i >= PAGE_OFFSET) {
     SetCursor(i - PAGE_OFFSET);
+    selecting_group = false;
+  }
 }
 
 void
@@ -213,30 +232,6 @@ TabMenuDisplay::SetCursor(unsigned i) noexcept
   cursor = i;
 }
 
-inline bool
-TabMenuDisplay::HighlightNext() noexcept
-{
-  const unsigned i = cursor + 1;
-  if (i >= GetNumPages())
-    return false;
-
-  SetCursor(i);
-  return true;
-}
-
-inline bool
-TabMenuDisplay::HighlightPrevious() noexcept
-{
-  if (cursor == 0)
-    return false;
-
-  const unsigned i = cursor - 1;
-  assert(i < GetNumPages());
-
-  SetCursor(i);
-  return true;
-}
-
 void
 TabMenuDisplay::OnResize(PixelSize new_size) noexcept
 {
@@ -253,14 +248,13 @@ TabMenuDisplay::OnKeyCheck(unsigned key_code) const noexcept
   case KEY_RIGHT:
     return true;
 
-  case KEY_DOWN:
-    /* Only claim Down while another menu item follows; at the last
-       item, let the dialog move focus to Close / arrows. */
-    return cursor + 1 < GetNumPages();
-
   case KEY_UP:
-    /* Same for Up at the first item. */
-    return cursor > 0;
+    return !selecting_group || GetPageMainIndex(cursor) >= main_columns;
+
+  case KEY_DOWN:
+    return selecting_group ||
+      cursor + sub_columns <=
+      main_menu_buttons[GetPageMainIndex(cursor)].last_page_index;
 
   default:
     return false;
@@ -272,18 +266,46 @@ TabMenuDisplay::OnKeyDown(unsigned key_code) noexcept
 {
   switch (key_code) {
   case KEY_RETURN:
-    pager.ClickPage(PAGE_OFFSET + cursor);
+    if (selecting_group) {
+      selecting_group = false;
+      Invalidate();
+    } else
+      pager.ClickPage(PAGE_OFFSET + cursor);
     return true;
 
-  case KEY_RIGHT:
-  case KEY_DOWN:
-    HighlightNext();
+  case KEY_RIGHT: case KEY_LEFT: case KEY_UP: case KEY_DOWN: {
+    const unsigned group = GetPageMainIndex(cursor);
+    const unsigned column = selecting_group
+      ? group % main_columns
+      : (cursor - main_menu_buttons[group].first_page_index) % sub_columns;
+    const unsigned columns = selecting_group ? main_columns : sub_columns;
+    if ((key_code == KEY_LEFT && column == 0) ||
+        (key_code == KEY_RIGHT && column + 1 == columns))
+      return true;
+    const int step = key_code == KEY_LEFT ? -1 : key_code == KEY_RIGHT ? 1 :
+      key_code == KEY_UP ? -int(selecting_group ? main_columns : sub_columns) :
+      int(selecting_group ? main_columns : sub_columns);
+    if (selecting_group) {
+      const int next = int(group) + step;
+      if (next >= 0 && next < int(GetNumMainMenuItems()))
+        SetCursor(main_menu_buttons[next].first_page_index);
+      else if (key_code == KEY_DOWN) {
+        selecting_group = false;
+        Invalidate();
+      }
+    } else {
+      const auto &main = main_menu_buttons[group];
+      const int next = int(cursor) + step;
+      if (next >= int(main.first_page_index) &&
+          next <= int(main.last_page_index))
+        SetCursor(next);
+      else if (key_code == KEY_UP && next < int(main.first_page_index)) {
+        selecting_group = true;
+        Invalidate();
+      }
+    }
     return true;
-
-  case KEY_LEFT:
-  case KEY_UP:
-    HighlightPrevious();
-    return true;
+  }
 
   default:
     return false;
@@ -332,6 +354,7 @@ TabMenuDisplay::OnMouseUp(PixelPoint Pos) noexcept
       else if (di.IsMain()) {
         /* move cursor to first item in this menu */
         cursor = main_menu_buttons[di.main_index].first_page_index;
+        selecting_group = false;
         Invalidate();
       } else {
         InvalidateButton(down_index);
@@ -366,6 +389,7 @@ inline void
 TabMenuDisplay::PaintMainMenuBorder(Canvas &canvas) const noexcept
 {
   PixelRect rc = GetMainMenuButtonSize(0);
+  rc.right = GetSize().width;
   rc.bottom = GetMainMenuButtonSize(GetNumMainMenuItems() - 1).bottom;
   rc.Grow(GetTabLineHeight());
 
@@ -392,7 +416,7 @@ TabMenuDisplay::PaintMainMenuItems(Canvas &canvas) const noexcept
       main_menu_index == GetPageMainIndex(cursor);
 
     main_menu_buttons[main_menu_index].Draw(canvas, look,
-                                            is_focused, isDown, is_selected);
+      is_focused && selecting_group, isDown, is_selected);
   }
 }
 
@@ -401,6 +425,7 @@ TabMenuDisplay::PaintSubMenuBorder(Canvas &canvas,
                                    const MainMenuButton &main_button) const noexcept
 {
   PixelRect rc = GetSubMenuButtonSize(main_button.first_page_index);
+  rc.right = GetSize().width;
   rc.bottom = GetSubMenuButtonSize(main_button.last_page_index).bottom;
   rc.Grow(GetTabLineHeight());
 
@@ -435,7 +460,8 @@ TabMenuDisplay::PaintSubMenuItems(Canvas &canvas) const noexcept
     const bool is_selected = is_pressed || is_cursor;
 
     buttons[page_index].Draw(canvas, look,
-                             is_focused, is_pressed, is_selected);
+                             is_focused && !selecting_group,
+                             is_pressed, is_selected);
   }
 }
 

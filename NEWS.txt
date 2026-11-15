@@ -7,6 +7,10 @@ Version 7.47 - not yet released
   - remember QNH and the maximum forecast temperature with that
     same question
 * ui
+  - arrange Configuration categories and pages in a compact grid with
+    icons for categories
+  - give dark-mode buttons a flat, outlined appearance and show a
+    distinct pressed state on buttons
   - add a ground-side shadow to the artificial horizon line so it
     stays visible on both sky and ground
   - draw the artificial-horizon aircraft reference as a yellow bar
@@ -94,6 +98,7 @@ Version 7.47 - not yet released
     login (wrong e-mail or password, subscription not active, too
     many devices) instead of "Loading SkySight catalog..." #2860
 * documentation
+  - describe the Configuration grid and dark-mode control feedback
   - describe the MacCready InfoBox speed-to-fly comment as true
     airspeed, labelled TAS, and the Setup switch for indicated
     airspeed

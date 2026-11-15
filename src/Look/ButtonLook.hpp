@@ -27,7 +27,10 @@ struct ButtonLook {
       dark_border_pen.Create(Layout::ScaleFinePenWidth(1), dark);
       dark_border_brush.Create(dark);
     }
-  } standard, selected, focused;
+  } standard, selected, focused, pressed;
+
+  /** Dark dialogs use a flat frame instead of a raised bevel. */
+  bool flat;
 
   struct {
     Color color;

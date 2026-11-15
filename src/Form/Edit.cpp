@@ -334,9 +334,10 @@ WndProperty::OnPaint(Canvas &canvas) noexcept
     canvas.Clear(look.focused.background_color);
 
   if (!caption.empty()) {
-    canvas.SetTextColor(focused && !pressed
-                          ? look.focused.text_color
-                          : look.text_color);
+    canvas.SetTextColor(pressed
+                        ? look.list.pressed.text_color
+                        : focused ? look.focused.text_color
+                                  : look.text_color);
     canvas.SetBackgroundTransparent();
     canvas.Select(look.text_font);
 

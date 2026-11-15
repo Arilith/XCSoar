@@ -9,13 +9,13 @@ void
 ButtonLook::Initialise(const Font &_font, bool dark_mode)
 {
   font = &_font;
+  flat = dark_mode;
 
   if (dark_mode) {
     standard.foreground_color = COLOR_WHITE;
     standard.foreground_brush.Create(standard.foreground_color);
     standard.background_color = COLOR_DARK_THEME_BUTTON;
-    standard.CreateBorder(LightColor(standard.background_color),
-                          DarkColor(standard.background_color));
+    standard.CreateBorder(COLOR_GRAY, COLOR_GRAY);
 
     selected.foreground_color = COLOR_WHITE;
     selected.foreground_brush.Create(selected.foreground_color);
@@ -26,8 +26,7 @@ ButtonLook::Initialise(const Font &_font, bool dark_mode)
     focused.foreground_color = COLOR_WHITE;
     focused.foreground_brush.Create(focused.foreground_color);
     focused.background_color = COLOR_XCSOAR;
-    focused.CreateBorder(LightColor(focused.background_color),
-                         DarkColor(focused.background_color));
+    focused.CreateBorder(COLOR_WHITE, COLOR_WHITE);
 
     disabled.color = COLOR_GRAY;
     disabled.brush.Create(disabled.color);
@@ -73,4 +72,9 @@ ButtonLook::Initialise(const Font &_font, bool dark_mode)
     disabled.color = COLOR_GRAY;
     disabled.brush.Create(disabled.color);
   }
+
+  pressed.foreground_color = COLOR_BLACK;
+  pressed.foreground_brush.Create(pressed.foreground_color);
+  pressed.background_color = COLOR_YELLOW;
+  pressed.CreateBorder(COLOR_BLACK, COLOR_BLACK);
 }

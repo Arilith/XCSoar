@@ -6,6 +6,7 @@
 #include "Widget/CreateWindowWidget.hpp"
 #include "Dialogs/WidgetDialog.hpp"
 #include "Look/DialogLook.hpp"
+#include "Look/IconLook.hpp"
 #include "UIGlobals.hpp"
 #include "ui/event/KeyCode.hpp"
 #include "Form/TabMenuDisplay.hpp"
@@ -552,6 +553,17 @@ void dlgConfigurationShowModal()
 
   menu.InitMenu(main_menu_captions, ARRAY_SIZE(main_menu_captions));
 
+  const IconLook &icons = UIGlobals::GetIconLook();
+  menu.SetMainIcon(0, &icons.hBmpTabWrench);
+  menu.SetMainIcon(1, &icons.hBmpTabFlight);
+  menu.SetMainIcon(2, &icons.hBmpTabCalculator);
+  menu.SetMainIcon(3, &icons.hBmpTabSystem);
+  menu.SetMainIcon(4, &icons.hBmpTabTask);
+  menu.SetMainIcon(5, &icons.hBmpTabSettings);
+  menu.SetMainIcon(6, &icons.hBmpTabTimes);
+  menu.SetMainIcon(7, &icons.hBmpTabFlight);
+  menu.SetMainIcon(8, &icons.hBmpTabWrench);
+
   /* restore last selected menu item */
   menu.SetCursor(current_page);
 
@@ -572,9 +584,12 @@ void dlgConfigurationShowModal()
 
   /* Esc on a settings panel returns to the menu (same as Back);
      on the menu itself, leave Esc to cancel the dialog. */
-  dialog.SetKeyDownFunction([&dialog](unsigned key_code) {
-    if (key_code != KEY_ESCAPE || pager->GetCurrentIndex() == 0)
+  dialog.SetKeyDownFunction([&dialog, &menu](unsigned key_code) {
+    if (key_code != KEY_ESCAPE)
       return false;
+
+    if (pager->GetCurrentIndex() == 0)
+      return menu.SelectGroups();
 
     OnCloseClicked(dialog);
     return true;

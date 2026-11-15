@@ -10,6 +10,7 @@
 struct TabMenuGroup;
 struct DialogLook;
 class PagerWidget;
+class MaskedIcon;
 
 class TabMenuDisplay final : public PaintWindow
 {
@@ -46,6 +47,7 @@ class TabMenuDisplay final : public PaintWindow
    */
   struct MainMenuButton {
     const char *caption;
+    const MaskedIcon *icon = nullptr;
 
     PixelRect rc;
 
@@ -62,10 +64,7 @@ class TabMenuDisplay final : public PaintWindow
     };
 
     void Draw(Canvas &canvas, const DialogLook &look,
-              bool focused, bool pressed, bool selected) const noexcept {
-      renderer.Draw(canvas, rc, look, caption, nullptr,
-                    focused, pressed, selected);
-    }
+              bool focused, bool pressed, bool selected) const noexcept;
   };
 
   /* internally used structure for tracking menu down and selection status */
@@ -131,6 +130,9 @@ class TabMenuDisplay final : public PaintWindow
    * Which page is currently selected by the cursor?
    */
   unsigned cursor = 0;
+  unsigned main_columns = 1;
+  unsigned sub_columns = 1;
+  bool selecting_group = true;
 
   /* used to render which submenu is drawn and which item is highlighted */
 
@@ -156,6 +158,21 @@ public:
 
   void SetCursor(unsigned i) noexcept;
 
+  void SetMainIcon(unsigned index, const MaskedIcon *icon) noexcept {
+    if (index < main_menu_buttons.size())
+      main_menu_buttons[index].icon = icon;
+  }
+
+  bool SelectGroups() noexcept {
+    if (selecting_group)
+      return false;
+    selecting_group = true;
+    if (IsDefined())
+      SetFocus();
+    Invalidate();
+    return true;
+  }
+
   /** Pager index of a menu page. The menu itself is page 0. */
   static constexpr unsigned PagerIndex(unsigned menu_index) noexcept {
     return PAGE_OFFSET + menu_index;
@@ -163,9 +180,6 @@ public:
 
 private:
   void UpdateLayout() noexcept;
-
-  bool HighlightNext() noexcept;
-  bool HighlightPrevious() noexcept;
 
 public:
   /**

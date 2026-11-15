@@ -25,8 +25,10 @@ GetStateLook(const ButtonLook &look, ButtonState state) noexcept
     return look.selected;
 
   case ButtonState::FOCUSED:
-  case ButtonState::PRESSED:
     return look.focused;
+
+  case ButtonState::PRESSED:
+    return look.pressed;
   }
 
   return look.standard;
@@ -39,6 +41,13 @@ ButtonFrameRenderer::DrawButton(Canvas &canvas, PixelRect rc,
   const ButtonLook::StateLook &_look = GetStateLook(look, state);
 
   canvas.DrawFilledRectangle(rc, _look.background_color);
+
+  if (look.flat) {
+    canvas.SelectHollowBrush();
+    canvas.Select(_look.light_border_pen);
+    canvas.DrawRectangle(rc);
+    return;
+  }
 
   const bool pressed = state == ButtonState::PRESSED;
   const unsigned margin = GetMargin();
