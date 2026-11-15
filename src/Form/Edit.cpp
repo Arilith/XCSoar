@@ -7,6 +7,9 @@
 #include "ui/canvas/Canvas.hpp"
 #include "Screen/Layout.hpp"
 #include "Form/Button.hpp"
+#include "Form/LXFieldGeometry.hpp"
+#include "Form/DataField/Boolean.hpp"
+#include "Renderer/LXFieldRenderer.hpp"
 #include "ui/event/KeyCode.hpp"
 #include "Dialogs/DataField.hpp"
 #include "Dialogs/WidgetDialog.hpp"
@@ -31,6 +34,9 @@ WndProperty::OnKeyCheck(unsigned key_code) const noexcept
   case KEY_RIGHT:
     return !IsReadOnly();
 
+  case KEY_SPACE:
+    return IsCheckBox() && !IsReadOnly();
+
   default:
     return WindowControl::OnKeyCheck(key_code);
   }
@@ -46,6 +52,13 @@ WndProperty::OnKeyDown(unsigned key_code) noexcept
   }
 
   switch (key_code) {
+  case KEY_SPACE:
+    if (!IsCheckBox() || IsReadOnly())
+      break;
+
+    ToggleCheckBox();
+    return true;
+
   case KEY_RIGHT:
     if (IsReadOnly())
       break;
@@ -132,8 +145,32 @@ WndProperty::SetCaptionWidth(int _caption_width) noexcept
 }
 
 bool
+WndProperty::IsCheckBox() const noexcept
+{
+  return look.lx && data_field != nullptr &&
+    data_field->GetType() == DataField::Type::BOOLEAN;
+}
+
+void
+WndProperty::ToggleCheckBox() noexcept
+{
+  auto &boolean = static_cast<DataFieldBoolean &>(*data_field);
+  boolean.ModifyValue(!boolean.GetValue());
+  RefreshDisplay();
+
+  /* like the LX9000, a tap on a check box row also selects it */
+  if (IsTabStop() && !HasFocus())
+    SetFocus();
+}
+
+bool
 WndProperty::BeginEditing() noexcept
 {
+  if (IsCheckBox() && !IsReadOnly()) {
+    ToggleCheckBox();
+    return true;
+  }
+
   if (IsReadOnly() || data_field == nullptr || edit_callback == nullptr) {
     /* If readonly and has content, show full content dialog */
     if (IsReadOnly() && !value.empty()) {
@@ -144,7 +181,14 @@ WndProperty::BeginEditing() noexcept
     OnHelp();
     return false;
   } else {
-    if (!edit_callback(GetCaption(), *data_field, GetHelpText()))
+    editing = true;
+    Invalidate();
+    const bool modified =
+      edit_callback(GetCaption(), *data_field, GetHelpText());
+    editing = false;
+    Invalidate();
+
+    if (!modified)
       return false;
 
     RefreshDisplay();
@@ -182,6 +226,21 @@ WndProperty::ShowFullContent() noexcept
 void
 WndProperty::UpdateLayout() noexcept
 {
+  if (look.lx) {
+    /* a check box row carries its caption inside the field */
+    const bool check_box = IsCheckBox();
+    const int label_width = check_box && caption_width >= 0
+      ? 0
+      : caption_width;
+    const unsigned label_height = check_box ? 0 : look.small_font.GetHeight();
+
+    edit_rc = LX::FieldGeometry::FromLook().GetFieldRect(GetClientRect(),
+                                                         label_width,
+                                                         label_height);
+    Invalidate();
+    return;
+  }
+
   edit_rc = GetClientRect();
 
   const unsigned margin = Layout::VptScale(1u);
@@ -310,8 +369,54 @@ WndProperty::SetValueWarning(bool warning) noexcept
 }
 
 void
+WndProperty::PaintLX(Canvas &canvas) noexcept
+{
+  const bool focused = HasCursorKeys() && HasFocus();
+  const bool check_box = IsCheckBox();
+
+  LX::FieldState state = LX::FieldState::NORMAL;
+  if (!IsEnabled())
+    state = LX::FieldState::DISABLED;
+  else if (!check_box && (pressed || editing))
+    state = LX::FieldState::EDITING;
+  else if (focused || pressed || editing)
+    state = LX::FieldState::FOCUSED;
+  else if (IsReadOnly())
+    state = LX::FieldState::READ_ONLY;
+
+  if (check_box) {
+    const auto &boolean = static_cast<const DataFieldBoolean &>(*data_field);
+    LX::DrawCheckBoxField(canvas, look, edit_rc, state, boolean.GetValue(),
+                          caption.c_str());
+    return;
+  }
+
+  LX::DrawField(canvas, edit_rc, state);
+  LX::DrawFieldValue(canvas, edit_rc, state, look.text_font, value.c_str(),
+                     value_warning);
+
+  if (caption_width < 0) {
+    const PixelRect area{edit_rc.left, 0, edit_rc.right,
+                         edit_rc.top - int(LX::Scale(LX::Field::RING_OUTSET))};
+    LX::DrawFieldLabel(canvas, area, LX::LabelPlacement::ABOVE_FIELD, state,
+                       look.small_font, caption.c_str());
+  } else {
+    const PixelRect area{int(Layout::GetTextPadding()), 0,
+                         caption_width - int(LX::Scale(LX::Form::LABEL_GAP)),
+                         int(canvas.GetHeight())};
+    LX::DrawFieldLabel(canvas, area, LX::LabelPlacement::LEFT_OF_FIELD, state,
+                       look.text_font, caption.c_str());
+  }
+}
+
+void
 WndProperty::OnPaint(Canvas &canvas) noexcept
 {
+  if (look.lx) {
+    PaintLX(canvas);
+    return;
+  }
+
   PixelRect visible_edit_rc = edit_rc;
   const int canvas_width = (int)canvas.GetWidth();
   const int canvas_height = (int)canvas.GetHeight();

@@ -14,6 +14,8 @@ FORM_SOURCES = \
 	$(SRC)/Renderer/BitmapButtonRenderer.cpp \
 	$(SRC)/Renderer/ColorButtonRenderer.cpp \
 	$(SRC)/Renderer/GestureRenderer.cpp \
+	$(SRC)/Renderer/GradientRenderer.cpp \
+	$(SRC)/Renderer/LXFieldRenderer.cpp \
 	$(FORM_SRC_DIR)/Control.cpp \
 	$(FORM_SRC_DIR)/Panel.cpp \
 	$(FORM_SRC_DIR)/VScrollPanel.cpp \

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ui/canvas/Color.hpp"
+#include "Screen/Layout.hpp"
 
 /**
  * Colours and metrics of the LXNAV LX9000 user interface.  All
@@ -13,6 +14,19 @@ namespace LX {
 
 static constexpr unsigned GRID_WIDTH = 480;
 static constexpr unsigned GRID_HEIGHT = 788;
+
+/**
+ * Convert a length of the design grid to pixels of the current
+ * screen.  Unlike #DesignGrid this does not need the size of a
+ * window: the short edge of the screen plays the role of the grid
+ * width, so a form looks the same in portrait and landscape.
+ */
+[[gnu::pure]]
+static inline unsigned
+Scale(unsigned design) noexcept
+{
+  return (design * Layout::min_screen_pixels + GRID_WIDTH / 2) / GRID_WIDTH;
+}
 
 static constexpr Color BACKGROUND = COLOR_BLACK;
 static constexpr Color TEXT = COLOR_WHITE;
@@ -34,6 +48,75 @@ static constexpr Color FIELD_BORDER = COLOR_WHITE;
 static constexpr Color FIELD_GRADIENT_TOP{0xff, 0xff, 0xff};
 static constexpr Color FIELD_GRADIENT_BOTTOM{0x81, 0x81, 0x81};
 static constexpr unsigned FIELD_RADIUS = 3;
+
+/** A value field of a settings form */
+namespace Field {
+
+static constexpr Color TOP{0x20, 0x20, 0x20};
+static constexpr Color BOTTOM{0x11, 0x11, 0x11};
+
+/** The outline of the dark field, between #TOP and #BOTTOM */
+static constexpr Color EDGE{0x18, 0x18, 0x18};
+
+/** Fill of a value that cannot be edited */
+static constexpr Color FLAT{0x20, 0x20, 0x20};
+
+/** The field while its value is being edited */
+static constexpr Color ACTIVE_TOP{0xff, 0xff, 0xff};
+static constexpr Color ACTIVE_BOTTOM{0x84, 0x84, 0x84};
+
+static constexpr Color TEXT = COLOR_WHITE;
+static constexpr Color DISABLED_TEXT{0x80, 0x80, 0x80};
+static constexpr Color FOCUS_RING = COLOR_WHITE;
+
+static constexpr unsigned HEIGHT = 36;
+static constexpr unsigned RADIUS = 3;
+
+/** The focus ring is drawn this far outside the field */
+static constexpr unsigned RING_OUTSET = 1;
+
+/** Distance between the field edge and the value text */
+static constexpr unsigned TEXT_PADDING = 4;
+
+/** Distance between the field edge and the highlight of the value */
+static constexpr unsigned HIGHLIGHT_INSET = 2;
+
+} // namespace Field
+
+/** The layout of a settings form */
+namespace Form {
+
+static constexpr unsigned MARGIN = 6;
+static constexpr unsigned COLUMN_GAP = 8;
+static constexpr unsigned ROW_PITCH = 45;
+
+/** A label is right-aligned this far left of its field */
+static constexpr unsigned LABEL_GAP = 6;
+
+/** Width of the field column when labels stand left of the fields */
+static constexpr unsigned VALUE_COLUMN_WIDTH = 172;
+
+/**
+ * Below this width a column is too narrow to read; the form stays
+ * in one column.
+ */
+static constexpr unsigned MIN_CELL_WIDTH = 200;
+
+} // namespace Form
+
+/** The check box glyph */
+namespace CheckBox {
+
+static constexpr unsigned BOX_SIZE = 19;
+static constexpr unsigned OUTLINE = 2;
+
+/** Distance between the left edge of the row and the glyph */
+static constexpr unsigned PADDING = 5;
+
+/** Distance between the glyph and the caption */
+static constexpr unsigned CAPTION_GAP = 12;
+
+} // namespace CheckBox
 
 /** Soft keys on the bottom edge */
 namespace SoftKey {

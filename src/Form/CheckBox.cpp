@@ -8,6 +8,8 @@
 #include "ui/event/KeyCode.hpp"
 #include "Screen/Layout.hpp"
 #include "Form/Button.hpp"
+#include "Form/LXFieldGeometry.hpp"
+#include "Renderer/LXFieldRenderer.hpp"
 #include "Asset.hpp"
 #include "util/Macros.hpp"
 
@@ -219,8 +221,28 @@ CheckBoxControl::OnCancelMode() noexcept
 }
 
 void
+CheckBoxControl::PaintLX(Canvas &canvas) noexcept
+{
+  LX::FieldState state = LX::FieldState::NORMAL;
+  if (!IsEnabled())
+    state = LX::FieldState::DISABLED;
+  else if (pressed || (HasCursorKeys() && HasFocus()))
+    state = LX::FieldState::FOCUSED;
+
+  const PixelRect field = LX::FieldGeometry::FromLook()
+    .GetFieldRect(PixelRect{canvas.GetSize()}, 0, 0);
+  LX::DrawCheckBoxField(canvas, *look, field, state, checked,
+                        caption.c_str());
+}
+
+void
 CheckBoxControl::OnPaint(Canvas &canvas) noexcept
 {
+  if (look->lx) {
+    PaintLX(canvas);
+    return;
+  }
+
   const auto &cb_look = look->check_box;
 
   const bool focused = HasCursorKeys() && HasFocus();

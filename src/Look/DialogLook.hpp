@@ -17,6 +17,14 @@
 struct DialogLook {
   bool dark_mode = false;
 
+  /**
+   * Draw dialog controls in the style of the LXNAV LX9000: dark
+   * gradient fields, check boxes with a tick, dense forms.  Only on
+   * colour displays in dark mode; the light theme and e-paper keep
+   * the classic controls.
+   */
+  bool lx = false;
+
   struct {
     Color text_color;
 

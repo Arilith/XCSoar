@@ -50,6 +50,9 @@ public:
 
   bool dragging = false, pressed = false;
 
+  /** True while the value is being changed in a picker dialog. */
+  bool editing = false;
+
 public:
   /**
    * Constructor of the WndProperty
@@ -107,6 +110,14 @@ public:
    * @return true if the value has been modified
    */
   bool BeginEditing() noexcept;
+
+  /**
+   * Is this a boolean value shown as a check box row?  Such a row is
+   * toggled by a tap or a key instead of being edited in a picker.
+   * Only with the LX look.
+   */
+  [[gnu::pure]]
+  bool IsCheckBox() const noexcept;
 
 private:
   /**
@@ -177,4 +188,9 @@ private:
   int DecValue() noexcept;
 
   void UpdateLayout() noexcept;
+
+  /** Paint the control in the style of the LX look. */
+  void PaintLX(Canvas &canvas) noexcept;
+
+  void ToggleCheckBox() noexcept;
 };

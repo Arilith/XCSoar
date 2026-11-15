@@ -47,6 +47,7 @@ void
 DialogLook::Initialise(bool _dark_mode)
 {
   dark_mode = _dark_mode;
+  lx = dark_mode && HasColors() && !IsDithered();
 
   LoadFonts();
 
@@ -137,7 +138,7 @@ DialogLook::Initialise(bool _dark_mode)
     }
   }
 
-  check_box.Initialise(text_font, dark_mode);
+  check_box.Initialise(text_font, dark_mode, lx);
 
   list.font = &text_font;
   list.font_bold = &bold_font;

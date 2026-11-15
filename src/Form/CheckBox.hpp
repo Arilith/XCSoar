@@ -76,6 +76,9 @@ protected:
 
   virtual bool OnClicked() noexcept;
 
+  /** Paint the control as a row of a form in the LX look. */
+  void PaintLX(Canvas &canvas) noexcept;
+
   /* virtual methods from class Window */
   bool OnKeyCheck(unsigned key_code) const noexcept override;
   bool OnKeyDown(unsigned key_code) noexcept override;
