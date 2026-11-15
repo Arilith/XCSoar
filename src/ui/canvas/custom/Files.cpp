@@ -4,12 +4,68 @@
 #include "Files.hpp"
 #include "ui/canvas/FontSearch.hpp"
 
+#include <cstdlib>
+
 static const char *const font_search_paths[] = {
   "/usr/share/fonts/truetype",
   "/usr/share/fonts/TTF",
   "/usr/share/fonts",
   nullptr
 };
+
+/*
+ * Tahoma is not bundled with XCSoar, but it is preferred over the
+ * default fonts when the user has installed it.
+ */
+static const char *const tahoma_search_paths[] = {
+  "/usr/share/fonts/truetype",
+  "/usr/share/fonts/TTF",
+  "/usr/share/fonts",
+  "/usr/local/share/fonts",
+  nullptr
+};
+
+static const char *const tahoma_font_paths[] = {
+  "tahoma.ttf",
+  "Tahoma.ttf",
+  "tahoma/tahoma.ttf",
+  "msttcorefonts/tahoma.ttf",
+  "corefonts/tahoma.ttf",
+  nullptr
+};
+
+static const char *const tahoma_bold_font_paths[] = {
+  "tahomabd.ttf",
+  "Tahoma Bold.ttf",
+  "Tahoma-Bold.ttf",
+  "tahoma/tahomabd.ttf",
+  "msttcorefonts/tahomabd.ttf",
+  "corefonts/tahomabd.ttf",
+  nullptr
+};
+
+/**
+ * Look in the user's font directories first ($HOME/.fonts and
+ * $HOME/.local/share/fonts), so no root access is needed to install
+ * Tahoma.
+ */
+static AllocatedPath
+FindTahoma(const char *const *list) noexcept
+{
+  if (const char *home = getenv("HOME"); home != nullptr && *home != '\0') {
+    const auto fonts = AllocatedPath::Build(Path(home), Path(".fonts"));
+    const auto local_fonts =
+      AllocatedPath::Build(Path(home), Path(".local/share/fonts"));
+    const char *const user_paths[] = {
+      fonts.c_str(), local_fonts.c_str(), nullptr
+    };
+
+    if (auto path = FontSearch::FindFile(user_paths, list); path != nullptr)
+      return path;
+  }
+
+  return FontSearch::FindFile(tahoma_search_paths, list);
+}
 
 static const char *const all_font_paths[] = {
   "ttf-dejavu/DejaVuSansCondensed.ttf",
@@ -96,12 +152,18 @@ static const char *const all_monospace_font_paths[] = {
 AllocatedPath
 FindDefaultFont() noexcept
 {
+  if (auto tahoma = FindTahoma(tahoma_font_paths); tahoma != nullptr)
+    return tahoma;
+
   return FontSearch::FindFile(font_search_paths, all_font_paths);
 }
 
 AllocatedPath
 FindDefaultBoldFont() noexcept
 {
+  if (auto tahoma = FindTahoma(tahoma_bold_font_paths); tahoma != nullptr)
+    return tahoma;
+
   return FontSearch::FindFile(font_search_paths, all_bold_font_paths);
 }
 
