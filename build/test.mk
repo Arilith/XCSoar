@@ -173,6 +173,7 @@ ifeq ($(TARGET_IS_ANDROID),n)
 # These programs are broken on Android because they require Java code
 TEST_NAMES += \
 	TestProfile \
+	TestProfileSummary \
 	TestSession \
 	TestDriver
 endif
@@ -668,6 +669,30 @@ TEST_PROFILE_SOURCES = \
 	$(TEST_SRC_DIR)/TestProfile.cpp
 TEST_PROFILE_DEPENDS = PROFILE MATH IO OS UTIL
 $(eval $(call link-program,TestProfile,TEST_PROFILE))
+
+TEST_PROFILE_SUMMARY_SOURCES = \
+	$(SRC)/Profile/ProfileSummary.cpp \
+	$(SRC)/Profile/Current.cpp \
+	$(SRC)/Profile/Map.cpp \
+	$(SRC)/DataFilePath.cpp \
+	$(SRC)/Units/UnitsGlue.cpp \
+	$(SRC)/Units/UnitsStore.cpp \
+	$(SRC)/Profile/NumericValue.cpp \
+	$(SRC)/Profile/PathValue.cpp \
+	$(SRC)/Profile/StringValue.cpp \
+	$(SRC)/Profile/UnitsConfig.cpp \
+	$(SRC)/Plane/PlaneFileGlue.cpp \
+	$(SRC)/Polar/Parser.cpp \
+	$(SRC)/Polar/Shape.cpp \
+	$(SRC)/Formatter/Units.cpp \
+	$(SRC)/Repository/FileType.cpp \
+	$(TEST_SRC_DIR)/FakeLocalPath.cpp \
+	$(TEST_SRC_DIR)/FakeLogFile.cpp \
+	$(TEST_SRC_DIR)/FakeLanguage.cpp \
+	$(TEST_SRC_DIR)/tap.c \
+	$(TEST_SRC_DIR)/TestProfileSummary.cpp
+TEST_PROFILE_SUMMARY_DEPENDS = UNITS IO OS MATH UTIL GLIDE
+$(eval $(call link-program,TestProfileSummary,TEST_PROFILE_SUMMARY))
 
 TEST_SESSION_SOURCES = \
 	$(SRC)/Session/SessionFile.cpp \

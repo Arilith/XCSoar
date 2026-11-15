@@ -25,3 +25,16 @@ void DrawVerticalGradient(Canvas &canvas, const PixelRect &rc,
  */
 void DrawBandedVerticalGradient(Canvas &canvas, const PixelRect &rc,
                                 Color top_color, Color bottom_color);
+
+/**
+ * Draw a rectangle with a one pixel border, a vertical gradient fill
+ * and corners that are rounded by omitting pixels.  Only Canvas
+ * rectangles are used, so it works on OpenGL and on the memory
+ * canvas alike.
+ *
+ * @param radius the size of the rounded corners in pixels; 0 draws
+ * square corners
+ */
+void DrawGradientBox(Canvas &canvas, const PixelRect &rc,
+                     Color top_color, Color bottom_color, Color border_color,
+                     unsigned radius) noexcept;

@@ -99,6 +99,7 @@ DIALOG_SOURCES = \
 	$(SRC)/Dialogs/dlgSimulatorPrompt.cpp \
 	$(SRC)/Dialogs/SimulatorPromptWindow.cpp \
 	$(SRC)/Dialogs/StartupDialog.cpp \
+	$(SRC)/Dialogs/ProfileScreen.cpp \
 	$(SRC)/Dialogs/ProfilePasswordDialog.cpp \
 	\
 	$(SRC)/Dialogs/dlgStatus.cpp \
@@ -255,6 +256,8 @@ XCSOAR_SOURCES := \
 	$(SRC)/Renderer/HorizonRenderer.cpp \
 	$(SRC)/Renderer/WarningRibbonRenderer.cpp \
 	$(SRC)/Renderer/GradientRenderer.cpp \
+	$(SRC)/Renderer/PeopleIconRenderer.cpp \
+	$(SRC)/Renderer/SoftButtonRenderer.cpp \
 	$(SRC)/Renderer/GlassRenderer.cpp \
 	$(SRC)/Renderer/TransparentRendererCache.cpp \
 	$(SRC)/Renderer/LabelBlock.cpp \
@@ -552,6 +555,7 @@ XCSOAR_SOURCES := \
 	$(SRC)/Profile/UIProfile.cpp \
 	$(SRC)/Profile/Settings.cpp \
 	$(SRC)/Profile/UnitsConfig.cpp \
+	$(SRC)/Profile/ProfileSummary.cpp \
 	$(SRC)/Profile/DeviceConfig.cpp \
 	$(SRC)/Profile/InfoBoxConfig.cpp \
 	$(SRC)/Profile/AirspaceConfig.cpp \

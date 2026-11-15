@@ -3,154 +3,20 @@
 
 #include "StartupDialog.hpp"
 #include "Error.hpp"
-#include "Form/Button.hpp"
 #include "Form/DataField/File.hpp"
-#include "Form/Form.hpp"
-#include "Gauge/LogoView.hpp"
 #include "Language/Language.hpp"
 #include "LocalPath.hpp"
 #include "LogFile.hpp"
-#include "Look/DialogLook.hpp"
 #include "Profile/Profile.hpp"
 #include "Repository/FileType.hpp"
 #include "ProfileListDialog.hpp"
 #include "ProfilePasswordDialog.hpp"
-#include "Screen/Layout.hpp"
+#include "ProfileScreen.hpp"
 #include "UIGlobals.hpp"
-#include "Widget/RowFormWidget.hpp"
-#include "Widget/TwoWidgets.hpp"
+#include "Widget/WindowWidget.hpp"
 #include "WidgetDialog.hpp"
 #include "system/FileUtil.hpp"
-#include "ui/canvas/Canvas.hpp"
-
-class LogoWindow final : public PaintWindow {
-  LogoView logo;
-  bool dark_mode;
-
-public:
-  explicit LogoWindow(bool _dark_mode = false,
-                     Color _background_color = COLOR_WHITE) noexcept
-    :dark_mode(_dark_mode), background_color(_background_color) {}
-
-protected:
-  void OnPaint(Canvas &canvas) noexcept override {
-    canvas.Clear(background_color);
-    logo.draw(canvas, GetClientRect(), dark_mode);
-  }
-
-private:
-  Color background_color;
-};
-
-class LogoQuitWidget final : public NullWidget {
-  const ButtonLook &look;
-  WndForm &dialog;
-
-  LogoWindow logo;
-  Button quit;
-
-public:
-  LogoQuitWidget(const ButtonLook &_look, WndForm &_dialog,
-                 bool dark_mode, Color background_color) noexcept
-    :look(_look), dialog(_dialog), logo(dark_mode, background_color) {}
-
-private:
-  PixelRect GetButtonRect(PixelRect rc) noexcept {
-    rc.left = rc.right - Layout::Scale(75);
-    rc.bottom = rc.top + Layout::GetMaximumControlHeight();
-    return rc;
-  }
-
-public:
-  /* virtual methods from class Widget */
-  PixelSize GetMinimumSize() const noexcept override {
-    return { 150, 150 };
-  }
-
-  PixelSize GetMaximumSize() const noexcept override {
-    /* use as much as possible */
-    return { 8192, 8192 };
-  }
-
-  void Prepare(ContainerWindow &parent,
-               const PixelRect &rc) noexcept override {
-    WindowStyle style;
-    style.Hide();
-
-    WindowStyle button_style(style);
-    button_style.Hide();
-    button_style.TabStop();
-
-    quit.Create(parent, look, _("Quit"), rc,
-                button_style, dialog.MakeModalResultCallback(mrCancel));
-    logo.Create(parent, rc, style);
-  }
-
-  void Show(const PixelRect &rc) noexcept override {
-    quit.MoveAndShow(GetButtonRect(rc));
-    logo.MoveAndShow(rc);
-  }
-
-  void Hide() noexcept override {
-    quit.FastHide();
-    logo.FastHide();
-  }
-
-  void Move(const PixelRect &rc) noexcept override {
-    quit.Move(GetButtonRect(rc));
-    logo.Move(rc);
-  }
-};
-
-class StartupWidget final : public RowFormWidget {
-  enum Controls {
-    PROFILE,
-    CONTINUE,
-  };
-
-  WndForm &dialog;
-  DataField *const df;
-
-public:
-  StartupWidget(const DialogLook &look, WndForm &_dialog,
-                DataField *_df) noexcept
-    :RowFormWidget(look), dialog(_dialog), df(_df) {}
-
-  /* virtual methods from class Widget */
-  void Prepare(ContainerWindow &parent,
-               const PixelRect &rc) noexcept override;
-  bool Save(bool &changed) noexcept override;
-
-  bool SetFocus() noexcept override {
-    /* focus the "Continue" button by default */
-    GetRow(CONTINUE).SetFocus();
-    return true;
-  }
-};
-
-static bool
-SelectProfileCallback([[maybe_unused]] const char *caption, [[maybe_unused]] DataField &_df,
-                      [[maybe_unused]] const char *help_text) noexcept
-{
-  FileDataField &df = (FileDataField &)_df;
-
-  const auto path = SelectProfileDialog(df.GetValue());
-  if (path == nullptr)
-    return false;
-
-  df.ForceModify(path);
-  return true;
-}
-
-void
-StartupWidget::Prepare([[maybe_unused]] ContainerWindow &parent,
-                       [[maybe_unused]] const PixelRect &rc) noexcept
-{
-  auto *pe = Add(_("Profile"), nullptr, df);
-  pe->SetEditCallback(SelectProfileCallback);
-
-  AddButton(_("Continue"), dialog.MakeModalResultCallback(mrOK));
-}
+#include "ui/event/KeyCode.hpp"
 
 static bool
 SelectProfile(Path path) noexcept
@@ -174,11 +40,84 @@ SelectProfile(Path path) noexcept
   return true;
 }
 
+/** Hosts the #ProfileScreen and maps keys and buttons to the dialog. */
+class StartupWidget final : public WindowWidget {
+  WidgetDialog &dialog;
+  FileDataField &df;
+
+public:
+  StartupWidget(WidgetDialog &_dialog, FileDataField &_df) noexcept
+    :dialog(_dialog), df(_df) {}
+
+  /* virtual methods from class Widget */
+  void Prepare(ContainerWindow &parent,
+               const PixelRect &rc) noexcept override;
+  bool Save(bool &changed) noexcept override;
+  bool KeyPress(unsigned key_code) noexcept override;
+
+private:
+  ProfileScreen &GetScreen() noexcept {
+    return static_cast<ProfileScreen &>(GetWindow());
+  }
+
+  void PickProfile() noexcept;
+};
+
+void
+StartupWidget::PickProfile() noexcept
+{
+  const auto path = SelectProfileDialog(df.GetValue());
+  if (path == nullptr)
+    return;
+
+  df.ForceModify(path);
+  GetScreen().OnSelectionChanged();
+}
+
+void
+StartupWidget::Prepare(ContainerWindow &parent,
+                       const PixelRect &rc) noexcept
+{
+  WindowStyle style;
+  style.Hide();
+  style.ControlParent();
+
+  auto screen = std::make_unique<ProfileScreen>(
+    df, [this](){ PickProfile(); },
+    dialog.MakeModalResultCallback(mrCancel),
+    dialog.MakeModalResultCallback(mrOK));
+  screen->Create(parent, rc, style);
+  SetWindow(std::move(screen));
+}
+
+bool
+StartupWidget::KeyPress(unsigned key_code) noexcept
+{
+  /* like the LX knob: the cursor keys change the profile directly */
+  switch (key_code) {
+  case KEY_UP:
+  case KEY_LEFT:
+    GetScreen().Step(-1);
+    return true;
+
+  case KEY_DOWN:
+  case KEY_RIGHT:
+    GetScreen().Step(1);
+    return true;
+
+  case KEY_RETURN:
+    dialog.SetModalResult(mrOK);
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 bool
 StartupWidget::Save(bool &changed) noexcept
 {
-  const auto &dff = (const FileDataField &)GetDataField(PROFILE);
-  if (!SelectProfile(dff.GetValue()))
+  if (!SelectProfile(df.GetValue()))
     return false;
 
   changed = true;
@@ -228,15 +167,10 @@ dlgStartupShowModal() noexcept
   dff->SetIndex(best_index);
 
   /* show the dialog */
-  const DialogLook &look = UIGlobals::GetDialogLook();
-  TWidgetDialog<TwoWidgets> dialog(WidgetDialog::Full{},
-                                   UIGlobals::GetMainWindow(),
-                                   UIGlobals::GetDialogLook(),
-                                   nullptr);
-
-  dialog.SetWidget(std::make_unique<LogoQuitWidget>(look.button, dialog,
-                                                    look.dark_mode, look.background_color),
-                   std::make_unique<StartupWidget>(look, dialog, dff));
+  TWidgetDialog<StartupWidget> dialog(WidgetDialog::Full{},
+                                      UIGlobals::GetMainWindow(),
+                                      UIGlobals::GetDialogLook(), nullptr);
+  dialog.SetWidget(dialog, *dff);
 
   return dialog.ShowModal() == mrOK;
 }

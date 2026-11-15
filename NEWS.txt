@@ -7,6 +7,11 @@ Version 7.47 - not yet released
   - remember QNH and the maximum forecast temperature with that
     same question
 * ui
+  - redesign the startup profile picker after the LXNAV LX9000: the
+    selected profile is shown with its glider, pilot, safety values
+    and data files, and can be changed with the cursor keys
+  - use Tahoma for all text on Linux if it is installed in
+    /usr/local/share/fonts, ~/.fonts or ~/.local/share/fonts
   - arrange Configuration categories and pages in a compact grid with
     icons for categories
   - give dark-mode buttons a flat, outlined appearance and show a

@@ -4,6 +4,8 @@
 #include "GradientRenderer.hpp"
 #include "ui/canvas/Canvas.hpp"
 
+#include <algorithm>
+
 #if defined(EYE_CANDY) && defined(ENABLE_OPENGL)
 
 #include "ui/canvas/opengl/VertexPointer.hpp"
@@ -76,5 +78,54 @@ DrawBandedVerticalGradient(Canvas &canvas, const PixelRect &rc,
                                          PixelPoint{rc.right, y1}},
                                Color(r, g, b));
 #endif
+  }
+}
+
+static constexpr uint8_t
+Interpolate(uint8_t a, uint8_t b, unsigned i, unsigned n) noexcept
+{
+  return uint8_t((a * (n - i) + b * i + n / 2) / n);
+}
+
+/** The colour at step i of n between two colours. */
+static constexpr Color
+Interpolate(Color a, Color b, unsigned i, unsigned n) noexcept
+{
+#ifdef GREYSCALE
+  return Color(Interpolate(a.GetLuminosity(), b.GetLuminosity(), i, n));
+#else
+  return Color(Interpolate(a.Red(), b.Red(), i, n),
+               Interpolate(a.Green(), b.Green(), i, n),
+               Interpolate(a.Blue(), b.Blue(), i, n));
+#endif
+}
+
+void
+DrawGradientBox(Canvas &canvas, const PixelRect &rc,
+                Color top_color, Color bottom_color, Color border_color,
+                unsigned radius) noexcept
+{
+  const int height = rc.GetHeight();
+  if (height < 2 || rc.GetWidth() < 2)
+    return;
+
+  for (int i = 0; i < height; ++i) {
+    /* distance from the nearest horizontal edge; the corner pixels
+       are missing in the outermost rows */
+    const int edge_distance = std::min(i, height - 1 - i);
+    const int inset = std::max(0, int(radius) - 1 - edge_distance);
+    const int left = rc.left + inset, right = rc.right - inset;
+    const int y = rc.top + i;
+
+    if (edge_distance == 0) {
+      canvas.DrawFilledRectangle({left, y, right, y + 1}, border_color);
+      continue;
+    }
+
+    const Color color = Interpolate(top_color, bottom_color, i, height - 1);
+
+    canvas.DrawFilledRectangle({left, y, right, y + 1}, color);
+    canvas.DrawFilledRectangle({left, y, left + 1, y + 1}, border_color);
+    canvas.DrawFilledRectangle({right - 1, y, right, y + 1}, border_color);
   }
 }
