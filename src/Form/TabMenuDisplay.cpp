@@ -54,46 +54,77 @@ LoadTileIcon(MaskedIcon &icon, const char *name) noexcept
   icon.KeepColours();
 }
 
-void
-TabMenuDisplay::InitMenu(const TabMenuGroup groups[], unsigned n_groups,
-                         const char *_title) noexcept
+/** Does the item (or any tile below it) exist on this platform? */
+static bool
+IsAvailable(const TabMenuItem &item) noexcept
 {
-  assert(groups != nullptr);
-  assert(n_groups <= MAX_TILES);
+  if (item.IsAvailable != nullptr && !item.IsAvailable())
+    return false;
 
-  title = _title;
+  if (item.children == nullptr)
+    return true;
 
-  /* a tile without a page of its own is built, but opens the page of
-     its alias */
-  for (unsigned i = 0; i < n_groups; i++) {
-    const auto &g = groups[i];
-    auto &tile = tiles.append();
-    tile.caption = gettext(g.caption);
-    LoadTileIcon(tile.icon, g.icon);
+  for (auto c = item.children; c->caption != nullptr; ++c)
+    if (IsAvailable(*c))
+      return true;
 
-    tile.first_page_index = pages.size();
-    for (auto p = g.pages; p->Load != nullptr; ++p) {
-      if (p->IsAvailable != nullptr && !p->IsAvailable())
-        continue;
+  return false;
+}
 
-      auto &page = pages.append();
-      page.caption = gettext(p->menu_caption);
-      page.tile = i;
+void
+TabMenuDisplay::InitMenu(const TabMenuItem *items,
+                         const char *title) noexcept
+{
+  auto &root = nodes.append();
+  root.caption = title;
+  root.load = nullptr;
+  root.action = nullptr;
+  root.page = NONE;
+  root.parent = NONE;
+  root.first_child = root.num_children = root.focus = 0;
 
-      /* Wrap panel in VScrollWidget for automatic scrolling when needed */
-      pager.Add(std::make_unique<VScrollWidget>(p->Load(), look));
-    }
+  Build(items, 0);
+}
 
-    tile.last_page_index = pages.size() - 1;
+void
+TabMenuDisplay::Build(const TabMenuItem *items, unsigned parent) noexcept
+{
+  /* the tiles of a grid are consecutive, so create them all before
+     the grids below them */
+  const unsigned first = nodes.size();
+  for (auto i = items; i->caption != nullptr; ++i) {
+    if (!IsAvailable(*i))
+      continue;
+
+    auto &node = nodes.append();
+    node.caption = gettext(i->caption);
+    node.load = i->Load;
+    node.action = i->Action;
+    node.page = NONE;
+    node.parent = parent;
+    node.first_child = node.num_children = node.focus = 0;
+    LoadTileIcon(node.icon, i->icon);
   }
 
-  for (unsigned i = 0; i < n_groups; i++) {
-    auto &tile = tiles[i];
-    if (tile.last_page_index + 1 == tile.first_page_index &&
-        groups[i].alias >= 0) {
-      tile.first_page_index = tiles[groups[i].alias].first_page_index;
-      tile.last_page_index = tiles[groups[i].alias].last_page_index;
-    }
+  nodes[parent].first_child = first;
+  nodes[parent].num_children = nodes.size() - first;
+
+  /* pages are added in the order of the tiles, depth first: the order
+     in which they are saved */
+  unsigned n = first;
+  for (auto i = items; i->caption != nullptr; ++i) {
+    if (!IsAvailable(*i))
+      continue;
+
+    const unsigned node = n++;
+    if (i->Load != nullptr) {
+      nodes[node].page = page_nodes.size();
+      page_nodes.append(node);
+
+      /* Wrap panel in VScrollWidget for automatic scrolling when needed */
+      pager.Add(std::make_unique<VScrollWidget>(i->Load(), look));
+    } else if (i->children != nullptr)
+      Build(i->children, node);
   }
 }
 
@@ -102,11 +133,26 @@ TabMenuDisplay::GetCaption(char buffer[], size_t size) const noexcept
 {
   const unsigned page = pager.GetCurrentIndex();
   if (page < PAGE_OFFSET)
-    return nullptr;
+    return IsSubGrid() ? nodes[current].caption : nullptr;
 
-  const auto &p = pages[page - PAGE_OFFSET];
-  StringFormat(buffer, size, "%s > %s", tiles[p.tile].caption, p.caption);
+  const Node &node = nodes[page_nodes[page - PAGE_OFFSET]];
+  if (node.parent == 0)
+    return node.caption;
+
+  StringFormat(buffer, size, "%s > %s", nodes[node.parent].caption,
+               node.caption);
   return buffer;
+}
+
+unsigned
+TabMenuDisplay::FindPage(std::unique_ptr<Widget> (*load)()) const noexcept
+{
+  for (const unsigned node : page_nodes)
+    if (nodes[node].load == load)
+      return PAGE_OFFSET + nodes[node].page;
+
+  assert(false);
+  return PAGE_OFFSET;
 }
 
 void
@@ -120,6 +166,12 @@ unsigned
 TabMenuDisplay::GetViewHeight() const noexcept
 {
   return GetSize().height;
+}
+
+unsigned
+TabMenuDisplay::GetNumRows() const noexcept
+{
+  return (GetNumTiles() + metrics.columns - 1) / metrics.columns;
 }
 
 void
@@ -155,9 +207,6 @@ TabMenuDisplay::UpdateLayout() noexcept
   m.pitch_x = m.tile_size.width + gap;
   m.pitch_y = m.tile_size.height + gap;
 
-  const unsigned rows = (tiles.size() + m.columns - 1) / m.columns;
-  m.content_height = m.top + rows * m.pitch_y;
-
   metrics = m;
   LoadFonts();
   SetScroll(scroll);
@@ -176,14 +225,14 @@ TabMenuDisplay::GetTileRect(unsigned i) const noexcept
 unsigned
 TabMenuDisplay::FindTile(PixelPoint p) const noexcept
 {
-  if (p.y < metrics.top)
-    return NO_TILE;
-
-  for (unsigned i = 0; i < tiles.size(); ++i)
-    if (GetTileRect(i).Contains(p) && GetTileRect(i).bottom <= int(GetViewHeight()))
+  for (unsigned i = 0; i < GetNumTiles(); ++i) {
+    const PixelRect rc = GetTileRect(i);
+    if (rc.top >= metrics.top && rc.bottom <= int(GetViewHeight()) &&
+        rc.Contains(p))
       return i;
+  }
 
-  return NO_TILE;
+  return NONE;
 }
 
 unsigned
@@ -199,7 +248,7 @@ void
 TabMenuDisplay::SetScroll(int value) noexcept
 {
   /* the grid scrolls by whole rows */
-  const unsigned rows = (tiles.size() + metrics.columns - 1) / metrics.columns;
+  const unsigned rows = GetNumRows();
   const unsigned visible = GetVisibleRows();
   const int max_row = rows > visible ? rows - visible : 0;
   const int row = std::clamp((value + metrics.pitch_y / 2) / metrics.pitch_y,
@@ -223,26 +272,63 @@ TabMenuDisplay::EnsureVisible(unsigned tile) noexcept
 }
 
 void
+TabMenuDisplay::SetCurrent(unsigned node) noexcept
+{
+  current = node;
+  scroll = 0;
+
+  if (IsDefined()) {
+    UpdateLayout();
+    EnsureVisible(GetCursorTile());
+    Invalidate();
+  }
+
+  if (level_callback)
+    level_callback();
+}
+
+void
+TabMenuDisplay::EnterGrid(unsigned node) noexcept
+{
+  SetCurrent(node);
+}
+
+bool
+TabMenuDisplay::LeaveSubGrid() noexcept
+{
+  if (!IsSubGrid())
+    return false;
+
+  SetCurrent(nodes[current].parent);
+  return true;
+}
+
+void
 TabMenuDisplay::OnPageFlipped() noexcept
 {
   const unsigned i = pager.GetCurrentIndex();
-  if (i >= PAGE_OFFSET && i - PAGE_OFFSET < pages.size())
-    SetCursor(pages[i - PAGE_OFFSET].tile);
+  if (i < PAGE_OFFSET || i - PAGE_OFFSET >= page_nodes.size())
+    return;
+
+  /* show the grid of the page, with the tile of the page focused */
+  const unsigned node = page_nodes[i - PAGE_OFFSET];
+  const unsigned parent = nodes[node].parent;
+  nodes[parent].focus = node - nodes[parent].first_child;
+  if (parent != current)
+    SetCurrent(parent);
+  else if (IsDefined())
+    EnsureVisible(GetCursorTile());
 }
 
 void
 TabMenuDisplay::SetCursor(unsigned i) noexcept
 {
-  if (tiles.empty())
+  if (nodes[0].num_children == 0)
     return;
 
-  i = std::min<unsigned>(i, tiles.size() - 1);
-  if (i == cursor)
-    return;
-
-  cursor = i;
-  if (IsDefined()) {
-    EnsureVisible(i);
+  nodes[0].focus = std::min<unsigned>(i, nodes[0].num_children - 1);
+  if (IsDefined() && current == 0) {
+    EnsureVisible(GetCursorTile());
     Invalidate();
   }
 }
@@ -255,22 +341,35 @@ TabMenuDisplay::OnResize(PixelSize new_size) noexcept
 }
 
 void
-TabMenuDisplay::Open(unsigned tile) noexcept
+TabMenuDisplay::Open(unsigned node) noexcept
 {
-  cursor = tile;
-  pager.ClickPage(GetPagerIndex(tile));
+  const Node &n = nodes[node];
+
+  if (n.action != nullptr)
+    n.action();
+  else if (n.page != NONE)
+    pager.ClickPage(PAGE_OFFSET + n.page);
+  else if (n.num_children == 1)
+    /* nothing to choose from */
+    Open(n.first_child);
+  else
+    EnterGrid(node);
 }
 
 void
 TabMenuDisplay::MoveCursor(int delta) noexcept
 {
-  const int next = int(cursor) + delta;
-  if (next >= 0 && next < int(tiles.size()))
-    SetCursor(next);
-  else if (delta > 0 && cursor / metrics.columns <
-           (tiles.size() - 1) / metrics.columns)
+  const int next = int(GetCursorTile()) + delta;
+  if (next >= 0 && next < int(GetNumTiles()))
+    Cursor() = next;
+  else if (delta > 0 && GetCursorTile() / metrics.columns + 1 < GetNumRows())
     /* moving down from a column that is missing in the last row */
-    SetCursor(tiles.size() - 1);
+    Cursor() = GetNumTiles() - 1;
+  else
+    return;
+
+  EnsureVisible(GetCursorTile());
+  Invalidate();
 }
 
 bool
@@ -283,10 +382,10 @@ TabMenuDisplay::OnKeyCheck(unsigned key_code) const noexcept
     return true;
 
   case KEY_UP:
-    return cursor >= metrics.columns;
+    return GetCursorTile() >= metrics.columns;
 
   case KEY_DOWN:
-    return cursor / metrics.columns < (tiles.size() - 1) / metrics.columns;
+    return GetCursorTile() / metrics.columns + 1 < GetNumRows();
 
   default:
     return false;
@@ -299,16 +398,16 @@ TabMenuDisplay::OnKeyDown(unsigned key_code) noexcept
   const int columns = metrics.columns;
   switch (key_code) {
   case KEY_RETURN:
-    Open(cursor);
+    Open(nodes[current].first_child + GetCursorTile());
     return true;
 
   case KEY_LEFT:
-    if (cursor % columns > 0)
+    if (GetCursorTile() % columns > 0)
       MoveCursor(-1);
     return true;
 
   case KEY_RIGHT:
-    if (cursor % columns + 1 < unsigned(columns))
+    if (GetCursorTile() % columns + 1 < unsigned(columns))
       MoveCursor(1);
     return true;
 
@@ -331,7 +430,7 @@ TabMenuDisplay::OnMouseDown(PixelPoint p) noexcept
   SetFocus();
 
   down_tile = FindTile(p);
-  if (down_tile == NO_TILE)
+  if (down_tile == NONE)
     return PaintWindow::OnMouseDown(p);
 
 #ifdef HAVE_VIBRATOR
@@ -346,14 +445,16 @@ TabMenuDisplay::OnMouseDown(PixelPoint p) noexcept
 bool
 TabMenuDisplay::OnMouseUp(PixelPoint p) noexcept
 {
-  if (down_tile == NO_TILE)
+  if (down_tile == NONE)
     return PaintWindow::OnMouseUp(p);
 
   /* like all XCSoar buttons: act on lift-off, inside the tile only */
   const unsigned tile = down_tile;
   OnCancelMode();
-  if (FindTile(p) == tile)
-    Open(tile);
+  if (FindTile(p) == tile) {
+    Cursor() = tile;
+    Open(nodes[current].first_child + tile);
+  }
   return true;
 }
 
@@ -361,7 +462,7 @@ bool
 TabMenuDisplay::OnMouseMove([[maybe_unused]] PixelPoint p,
                             [[maybe_unused]] unsigned keys) noexcept
 {
-  if (down_tile == NO_TILE)
+  if (down_tile == NONE)
     return false;
 
   Invalidate();
@@ -379,8 +480,8 @@ TabMenuDisplay::OnMouseWheel([[maybe_unused]] PixelPoint p,
 void
 TabMenuDisplay::OnCancelMode() noexcept
 {
-  if (down_tile != NO_TILE) {
-    down_tile = NO_TILE;
+  if (down_tile != NONE) {
+    down_tile = NONE;
     ReleaseCapture();
     Invalidate();
   }
@@ -390,19 +491,19 @@ TabMenuDisplay::OnCancelMode() noexcept
 void
 TabMenuDisplay::DrawTile(Canvas &canvas, unsigned i) const noexcept
 {
-  const Tile &tile = tiles[i];
+  const Node &tile = GetTile(i);
   const PixelRect rc = GetTileRect(i);
   const bool pressed = i == down_tile;
-  const bool focused = pressed || (i == cursor && HasCursorKeys() &&
+  const bool is_cursor = i == GetCursorTile();
+  const bool focused = pressed || (is_cursor && HasCursorKeys() &&
                                    HasFocus());
 
   canvas.SetBackgroundTransparent();
 
   if (!look.lx) {
     canvas.DrawFilledRectangle(rc, look.list.GetBackgroundColor(
-                                 i == cursor, focused, pressed));
-    canvas.SetTextColor(look.list.GetTextColor(i == cursor, focused,
-                                               pressed));
+                                 is_cursor, focused, pressed));
+    canvas.SetTextColor(look.list.GetTextColor(is_cursor, focused, pressed));
     canvas.Select(*look.button.font);
     const unsigned padding = Layout::GetTextPadding();
     canvas.DrawClippedText({rc.left + int(padding),
@@ -443,6 +544,7 @@ TabMenuDisplay::DrawTitle(Canvas &canvas) const noexcept
                               rule_y + std::max(1, int(LX::Scale(1)))},
                              LX::TEXT);
 
+  const char *title = nodes[current].caption;
   canvas.SetBackgroundTransparent();
   canvas.SetTextColor(LX::TEXT);
   canvas.Select(title_font);
@@ -454,7 +556,7 @@ TabMenuDisplay::DrawTitle(Canvas &canvas) const noexcept
 void
 TabMenuDisplay::DrawScrollBar(Canvas &canvas) const noexcept
 {
-  const unsigned rows = (tiles.size() + metrics.columns - 1) / metrics.columns;
+  const unsigned rows = GetNumRows();
   const unsigned visible = GetVisibleRows();
   if (rows <= visible)
     return;
@@ -477,7 +579,7 @@ TabMenuDisplay::OnPaint(Canvas &canvas) noexcept
                        : (look.dark_mode ? DarkColor(look.background_color)
                                          : COLOR_BLACK));
 
-  for (unsigned i = 0; i < tiles.size(); ++i) {
+  for (unsigned i = 0; i < GetNumTiles(); ++i) {
     const PixelRect rc = GetTileRect(i);
     if (rc.top >= metrics.top && rc.bottom <= int(GetViewHeight()))
       DrawTile(canvas, i);

@@ -6,7 +6,17 @@
 #include "Widget/CreateWindowWidget.hpp"
 #include "Dialogs/WidgetDialog.hpp"
 #include "Look/DialogLook.hpp"
-#include "Look/IconLook.hpp"
+#include "Dialogs/FileManager.hpp"
+#include "Dialogs/ProfileListDialog.hpp"
+#include "Dialogs/ProfilePasswordDialog.hpp"
+#include "Dialogs/Plane/PlaneDialogs.hpp"
+#include "Dialogs/Device/DeviceListDialog.hpp"
+#include "Dialogs/DataManagement/ExportFlightsPanel.hpp"
+#include "Dialogs/DataManagement/ImportDataPanel.hpp"
+#include "Dialogs/DataManagement/BackupRestorePanel.hpp"
+#include "Dialogs/DataManagement/AdvancedFileExplorer.hpp"
+#include "BackendComponents.hpp"
+#include "Components.hpp"
 #include "UIGlobals.hpp"
 #include "ui/event/KeyCode.hpp"
 #include "Form/TabMenuDisplay.hpp"
@@ -23,6 +33,8 @@
 #include "Panels/UnitsConfigPanel.hpp"
 #include "Panels/TimeConfigPanel.hpp"
 #include "Panels/LoggerConfigPanel.hpp"
+#include "Panels/PilotConfigPanel.hpp"
+#include "Panels/AirspaceWarningsConfigPanel.hpp"
 #include "Panels/AirspaceConfigPanel.hpp"
 #include "Panels/SiteConfigPanel.hpp"
 #include "Panels/MapDisplayConfigPanel.hpp"
@@ -106,167 +118,200 @@ static std::unique_ptr<Widget> (*initial_page)() = nullptr;
 
 // TODO: eliminate global variables
 static ArrowPagerWidget *pager;
+static TabMenuDisplay *menu_display;
 
-static constexpr TabMenuPage logger_pages[] = {
-  { N_("Logger"), CreateLoggerConfigPanel },
-  { nullptr, nullptr }
+static void
+ShowDevices() noexcept
+{
+  if (backend_components != nullptr)
+    ShowDeviceList(backend_components->devices.get());
+}
+
+/* Pages are created, and therefore saved, in the order of this table.
+   Important: all pages after Units must not have data fields that are
+   unit-dependent because they will be saved after their units may have
+   changed.  The Units tile is therefore placed after every
+   unit-dependent page. */
+
+static void
+ShowExportFlights() noexcept
+{
+  ShowExportFlightsDialog();
+}
+
+static constexpr TabMenuItem vario_items[] = {
+  { .caption = N_("Glide Computer"), .Load = CreateGlideComputerConfigPanel },
+  { .caption = N_("Safety Factors"), .Load = CreateSafetyFactorsConfigPanel },
+  { .caption = N_("Wind"), .Load = CreateWindConfigPanel },
+  { .caption = N_("Route"), .Load = CreateRouteConfigPanel },
+  { nullptr }
 };
 
-static constexpr TabMenuPage computer_pages[] = {
-  { N_("Glide Computer"), CreateGlideComputerConfigPanel },
-  { N_("Route"), CreateRouteConfigPanel },
-  { N_("Safety Factors"), CreateSafetyFactorsConfigPanel },
-  { N_("Wind"), CreateWindConfigPanel },
-  { nullptr, nullptr }
+static constexpr TabMenuItem display_items[] = {
+  { .caption = N_("Screen"), .Load = CreateDisplayConfigPanel },
+  { .caption = N_("Layout"), .Load = CreateLayoutConfigPanel },
+  { .caption = N_("Pages"), .Load = CreatePagesConfigPanel },
+  { .caption = N_("InfoBox Sets"), .Load = CreateInfoBoxesConfigPanel },
+  { nullptr }
 };
 
-static constexpr TabMenuPage display_pages[] = {
-  { N_("Screen"), CreateDisplayConfigPanel },
-  { N_("Layout"), CreateLayoutConfigPanel },
-  { N_("Pages"), CreatePagesConfigPanel },
-  { N_("InfoBox Sets"), CreateInfoBoxesConfigPanel },
-  { N_("Vario"), CreateVarioConfigPanel },
-  { nullptr, nullptr }
+static constexpr TabMenuItem transfer_items[] = {
+  { .caption = N_("Site Files"), .Load = CreateSiteConfigPanel },
+  { .caption = NC_("Button", "Download manager"), .Action = ShowFileManager },
+  { .caption = NC_("Button", "Export flights"),
+    .Action = ShowExportFlights },
+  { .caption = NC_("Button", "Import data"), .Action = ShowImportDataDialog },
+  { .caption = NC_("Button", "Backup manager"),
+    .Action = ShowBackupManagerDialog },
+  { .caption = NC_("Button", "Advanced File Explorer"),
+    .Action = ShowAdvancedFileExplorerDialog },
+  { nullptr }
 };
 
-static constexpr TabMenuPage files_pages[] = {
-  { N_("Site Files"), CreateSiteConfigPanel },
-  { nullptr, nullptr }
+static constexpr TabMenuItem map_items[] = {
+  { .caption = N_("Orientation"), .Load = CreateMapDisplayConfigPanel },
+  { .caption = N_("Overlays"), .Load = CreateMapOverlaysConfigPanel },
+  { .caption = N_("Terrain"), .Load = CreateTerrainDisplayConfigPanel },
+  { nullptr }
 };
 
-static constexpr TabMenuPage graphics_pages[] = {
-  { N_("Airspace"), CreateAirspaceConfigPanel },
-  { N_("Elements"), CreateSymbolsConfigPanel },
-#ifdef HAVE_HTTP
-  { NC_("Setting", "NOTAM"), CreateNOTAMConfigPanel },
-#endif
-  { N_("Orientation"), CreateMapDisplayConfigPanel },
-  { N_("Overlays"), CreateMapOverlaysConfigPanel },
-  { N_("Terrain"), CreateTerrainDisplayConfigPanel },
-  { N_("Waypoints"), CreateWaypointDisplayConfigPanel },
-  { N_("Thermal Assistant"), CreateGaugesConfigPanel },
-  { N_("Traffic"), CreateTrafficConfigPanel },
+static constexpr TabMenuItem weather_items[] = {
 #ifdef HAVE_PCMET
-  { "Flugwetter (pc_met)", CreatePCMetConfigPanel },
+  { .caption = "Flugwetter (pc_met)", .Load = CreatePCMetConfigPanel },
 #endif
-  { "RASP", CreateRaspConfigPanel },
+  { .caption = "RASP", .Load = CreateRaspConfigPanel },
 #ifdef HAVE_HTTP
-  { "SkySight", CreateSkySightConfigPanel },
-  { N_("Thermal Information Map"), CreateWeatherConfigPanel },
-  { "XC Therm", CreateXCThermConfigPanel },
+  { .caption = "SkySight", .Load = CreateSkySightConfigPanel },
+  { .caption = N_("Thermal Information Map"),
+    .Load = CreateWeatherConfigPanel },
+  { .caption = "XC Therm", .Load = CreateXCThermConfigPanel },
 #endif
-  { nullptr, nullptr }
+  { nullptr }
 };
 
-static constexpr TabMenuPage sound_pages[] = {
-#ifdef HAVE_PCM_PLAYER
-  /* Before Units: audio vario deadband uses vertical-speed units. */
-  { N_("Audio"), CreateAudioConfigPanel },
+static constexpr TabMenuItem airspace_items[] = {
+  { .caption = N_("Airspace"), .Load = CreateAirspaceConfigPanel },
+#ifdef HAVE_HTTP
+  { .caption = NC_("Setting", "NOTAM"), .Load = CreateNOTAMConfigPanel },
 #endif
-  { nullptr, nullptr }
+  { nullptr }
 };
 
-static constexpr TabMenuPage task_pages[] = {
-  { N_("Task Rules"), CreateTaskRulesConfigPanel },
-  { N_("Turnpoint Types"), CreateTaskDefaultsConfigPanel },
-  { nullptr, nullptr }
+static constexpr TabMenuItem thermal_items[] = {
+  { .caption = N_("Thermal Assistant"), .Load = CreateGaugesConfigPanel },
+  { .caption = N_("Vario"), .Load = CreateVarioConfigPanel },
+  { nullptr }
 };
 
-static constexpr TabMenuPage optimization_pages[] = {
-  { N_("Scoring"), CreateScoringConfigPanel },
-  { nullptr, nullptr }
+/* the pages of the original Graphics sub-menu of the LX9000 */
+static constexpr TabMenuItem graphics_items[] = {
+  { .caption = N_("Map and Terrain"), .children = map_items,
+    .icon = "lx_map" },
+  { .caption = N_("Weather"), .children = weather_items,
+    .icon = "lx_weather" },
+  { .caption = N_("Airspaces and NOTAMs"), .children = airspace_items,
+    .icon = "lx_airspace" },
+  { .caption = N_("Waypoints and Airports"),
+    .Load = CreateWaypointDisplayConfigPanel,
+    .icon = "lx_waypoints" },
+  { .caption = N_("Glider and Track"), .Load = CreateSymbolsConfigPanel,
+    .icon = "lx_glider" },
+  { .caption = N_("Thermal Mode"), .children = thermal_items,
+    .icon = "lx_thermal" },
+  { .caption = N_("FLARM"), .Load = CreateTrafficConfigPanel,
+    .icon = "lx_flarm" },
+  { nullptr }
 };
 
-static constexpr TabMenuPage units_pages[] = {
-  { N_("Units"), CreateUnitsConfigPanel },
-  { nullptr, nullptr }
+static constexpr TabMenuItem task_items[] = {
+  { .caption = N_("Turnpoint Types"), .Load = CreateTaskDefaultsConfigPanel },
+  { .caption = N_("Task Rules"), .Load = CreateTaskRulesConfigPanel },
+  { nullptr }
 };
 
-// Important: all pages after Units in the pager must not have data fields
-// that are unit-dependent because they will be saved after their units may
-// have changed.  The tiles are therefore ordered so that Units comes after
-// every unit-dependent page.
-static constexpr TabMenuPage hardware_pages[] = {
-  { N_("Network"), CreateNetworkConfigPanel },
+static constexpr TabMenuItem hardware_items[] = {
+  { .caption = N_("Devices"), .Action = ShowDevices },
+  { .caption = N_("Network"), .Load = CreateNetworkConfigPanel },
+  { .caption = NC_("Setting", "Time"), .Load = CreateTimeConfigPanel },
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(KOBO)
-  { N_("System Services"), CreateSystemdConfigPanel },
+  { .caption = N_("System Services"), .Load = CreateSystemdConfigPanel },
 #ifdef USE_POLL_EVENT
-  { N_("System Tools"), CreateSystemToolsPanel, HasSystemTools },
+  { .caption = N_("System Tools"), .Load = CreateSystemToolsPanel,
+    .IsAvailable = HasSystemTools },
 #endif
 #endif
-  { NC_("Setting", "Time"), CreateTimeConfigPanel },
-  { nullptr, nullptr }
+  { nullptr }
 };
 
-static constexpr TabMenuPage online_pages[] = {
+static constexpr TabMenuItem pilot_items[] = {
+  { .caption = N_("Profiles"), .Action = ProfileListDialog },
+  { .caption = N_("Pilots"), .Load = CreatePilotConfigPanel },
+  { nullptr }
+};
+
+static constexpr TabMenuItem service_items[] = {
 #ifdef HAVE_LIVETRACK24
-  { "LiveTrack24", CreateLiveTrack24ConfigPanel },
+  { .caption = "LiveTrack24", .Load = CreateLiveTrack24ConfigPanel },
 #endif
 #ifdef HAVE_SKYLINES_TRACKING
-  { "SkyLines", CreateSkyLinesConfigPanel },
+  { .caption = "SkyLines", .Load = CreateSkyLinesConfigPanel },
 #endif
-  { "WeGlide", CreateWeGlideConfigPanel },
+  { .caption = "WeGlide", .Load = CreateWeGlideConfigPanel },
 #ifdef HAVE_HTTP
-  { "SoaringScoring", CreateSoaringScoringConfigPanel },
+  { .caption = "SoaringScoring", .Load = CreateSoaringScoringConfigPanel },
 #endif
 #ifdef HAVE_TRACKING
-  { "XCSoar Cloud", CreateCloudConfigPanel },
+  { .caption = "XCSoar Cloud", .Load = CreateCloudConfigPanel },
 #endif
-  { nullptr, nullptr }
-};
-
-static constexpr TabMenuPage language_pages[] = {
-  { N_("Language, Input"), CreateInterfaceConfigPanel },
-  { nullptr, nullptr }
-};
-
-static constexpr TabMenuPage no_pages[] = {
-  { nullptr, nullptr }
+  { nullptr }
 };
 
 /**
  * The tiles of the LXNAV LX9000 "Setup" menu, in the order of the
- * original.  A tile without pages opens the page of another tile
- * (the last member) until it has a page of its own.
+ * original.
  */
-static constexpr TabMenuGroup main_menu_captions[] = {
-  { N_("QNH and RES"), no_pages, "lx_qnhres", 3 },
-  { N_("Flight Recorder"), logger_pages, "lx_loger" },
-  { N_("Weight and Balance"), no_pages, "lx_weightbalance", 3 },
-  { N_("Vario Parameters"), computer_pages, "lx_varioset" },
-  { N_("Display"), display_pages, "lx_display" },
-  { N_("Files and Transfer"), files_pages, "lx_transfer" },
-  { N_("Graphics"), graphics_pages, "lx_graphics" },
-  { N_("Sounds"), sound_pages, "lx_sounds", 4 },
-  { N_("Observation Zones"), task_pages, "lx_oz" },
-  { N_("Optimization"), optimization_pages, "lx_optimization" },
-  { N_("Warnings"), no_pages, "lx_warnings", 6 },
-  { N_("Units"), units_pages, "lx_units" },
-  { N_("Hardware"), hardware_pages, "lx_hardware" },
-  { N_("Polar and Glider"), no_pages, "lx_polar", 3 },
-  { N_("Profiles and Pilots"), no_pages, "lx_pilots", 1 },
-  { NC_("Menu", "Services"), online_pages, "lx_cloudservices" },
-  { N_("Language"), language_pages, "lx_lang" },
-  { N_("Password"), no_pages, "lx_pwd", 16 },
+static constexpr TabMenuItem main_menu_items[] = {
+  { .caption = N_("QNH and RES"), .Action = dlgBasicSettingsShowModal,
+    .icon = "lx_qnhres" },
+  { .caption = N_("Flight Recorder"), .Load = CreateLoggerConfigPanel,
+    .icon = "lx_loger" },
+  { .caption = N_("Weight and Balance"), .Action = dlgBasicSettingsShowModal,
+    .icon = "lx_weightbalance" },
+  { .caption = N_("Vario Parameters"), .children = vario_items,
+    .icon = "lx_varioset" },
+  { .caption = N_("Display"), .children = display_items,
+    .icon = "lx_display" },
+  { .caption = N_("Files and Transfer"), .children = transfer_items,
+    .icon = "lx_transfer" },
+  { .caption = N_("Graphics"), .children = graphics_items,
+    .icon = "lx_graphics" },
+#ifdef HAVE_PCM_PLAYER
+  /* Before Units: audio vario deadband uses vertical-speed units. */
+  { .caption = N_("Sounds"), .Load = CreateAudioConfigPanel,
+    .icon = "lx_sounds" },
+#endif
+  { .caption = N_("Observation Zones"), .children = task_items,
+    .icon = "lx_oz" },
+  { .caption = N_("Optimization"), .Load = CreateScoringConfigPanel,
+    .icon = "lx_optimization" },
+  { .caption = N_("Warnings"), .Load = CreateAirspaceWarningsConfigPanel,
+    .icon = "lx_warnings" },
+  { .caption = N_("Units"), .Load = CreateUnitsConfigPanel,
+    .icon = "lx_units" },
+  { .caption = N_("Hardware"), .children = hardware_items,
+    .icon = "lx_hardware" },
+  { .caption = N_("Polar and Glider"), .Action = dlgPlanesShowModal,
+    .icon = "lx_polar" },
+  { .caption = N_("Profiles and Pilots"), .children = pilot_items,
+    .icon = "lx_pilots" },
+  { .caption = NC_("Menu", "Services"), .children = service_items,
+    .icon = "lx_cloudservices" },
+  { .caption = N_("Language"), .Load = CreateInterfaceConfigPanel,
+    .icon = "lx_lang" },
+  { .caption = N_("Password"), .Action = ChangeProfilePassword,
+    .icon = "lx_pwd" },
+  { nullptr }
 };
-
-static unsigned
-FindConfigPage(std::unique_ptr<Widget> (*load)()) noexcept
-{
-  unsigned index = 0;
-  for (const auto &group : main_menu_captions) {
-    for (auto page = group.pages; page->Load != nullptr; ++page) {
-      if (page->IsAvailable != nullptr && !page->IsAvailable())
-        continue;
-      if (page->Load == load)
-        return index;
-      ++index;
-    }
-  }
-
-  assert(false);
-  return 0;
-}
 
 static void
 OnUserLevel(bool expert) noexcept;
@@ -507,32 +552,39 @@ OnUserLevel(bool expert) noexcept
 }
 
 /**
- * Close on the menu page commits (mrOK).  On a settings page, return
- * to the menu (Back).
+ * Close on the main grid commits (mrOK).  On a settings page or a
+ * sub-grid, go back (Back).
  */
 static void
 OnCloseClicked(WidgetDialog &dialog)
 {
-  if (pager->GetCurrentIndex() == 0)
-    dialog.SetModalResult(mrOK);
-  else
+  if (pager->GetCurrentIndex() != 0)
     pager->ClickPage(0);
+  else if (!menu_display->LeaveSubGrid())
+    dialog.SetModalResult(mrOK);
 }
 
+/** Show the title and the Close/Back button of the current page. */
 static void
-OnPageFlipped(WidgetDialog &dialog, TabMenuDisplay &menu)
+UpdateChrome(WidgetDialog &dialog, TabMenuDisplay &menu)
 {
-  menu.OnPageFlipped();
-
   char buffer[128];
   const char *caption = menu.GetCaption(buffer, ARRAY_SIZE(buffer));
   if (caption == nullptr)
     caption = _("Configuration");
   dialog.SetCaption(caption);
 
-  pager->SetCloseButtonCaption(pager->GetCurrentIndex() == 0
+  pager->SetCloseButtonCaption(pager->GetCurrentIndex() == 0 &&
+                               !menu.IsSubGrid()
                                ? _("Close")
                                : _("Back"));
+}
+
+static void
+OnPageFlipped(WidgetDialog &dialog, TabMenuDisplay &menu)
+{
+  menu.OnPageFlipped();
+  UpdateChrome(dialog, menu);
 }
 
 void
@@ -542,8 +594,7 @@ dlgConfigurationShowPage(std::unique_ptr<Widget> (*page)())
 
   /* Already inside Configuration: this is one of its pages. */
   if (pager != nullptr) {
-    pager->SetCurrent(TabMenuDisplay::PagerIndex(FindConfigPage(page)),
-                      false);
+    pager->SetCurrent(menu_display->FindPage(page), false);
     return;
   }
 
@@ -563,6 +614,7 @@ void dlgConfigurationShowModal()
      panel crashes in BorrowExtraButton(). */
   AtScopeExit() {
     pager = nullptr;
+    menu_display = nullptr;
   };
 
   WidgetDialog dialog(WidgetDialog::Full{}, UIGlobals::GetMainWindow(),
@@ -574,6 +626,7 @@ void dlgConfigurationShowModal()
 
   auto _menu = std::make_unique<TabMenuDisplay>(*pager, look);
   auto &menu = *_menu;
+  menu_display = &menu;
   pager->Add(std::make_unique<CreateWindowWidget>([&_menu](ContainerWindow &parent,
                                                            const PixelRect &rc,
                                                            WindowStyle style) {
@@ -582,19 +635,21 @@ void dlgConfigurationShowModal()
     return std::move(_menu);
   }));
 
-  menu.InitMenu(main_menu_captions, ARRAY_SIZE(main_menu_captions),
-                C_("Menu", "Setup"));
+  menu.InitMenu(main_menu_items, C_("Menu", "Setup"));
 
   /* restore last selected menu item */
   menu.SetCursor(current_page);
 
   if (initial_page != nullptr) {
-    const unsigned index = FindConfigPage(initial_page);
-    pager->SetCurrent(TabMenuDisplay::PagerIndex(index), false);
+    pager->SetCurrent(menu.FindPage(initial_page), false);
   }
 
   pager->SetPageFlippedCallback([&dialog, &menu](){
     OnPageFlipped(dialog, menu);
+  });
+
+  menu.SetLevelCallback([&dialog, &menu](){
+    UpdateChrome(dialog, menu);
   });
 
   dialog.FinishPreliminary(pager);
@@ -603,14 +658,15 @@ void dlgConfigurationShowModal()
     OnPageFlipped(dialog, menu);
   }
 
-  /* Esc on a settings panel returns to the menu (same as Back);
-     on the menu itself, leave Esc to cancel the dialog. */
+  /* Esc on a settings panel returns to the menu (same as Back); in a
+     sub-grid it returns to the main grid; there, leave Esc to cancel
+     the dialog. */
   dialog.SetKeyDownFunction([&dialog, &menu](unsigned key_code) {
     if (key_code != KEY_ESCAPE)
       return false;
 
     if (pager->GetCurrentIndex() == 0)
-      return false;
+      return menu.LeaveSubGrid();
 
     OnCloseClicked(dialog);
     return true;

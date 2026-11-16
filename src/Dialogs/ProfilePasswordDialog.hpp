@@ -50,3 +50,10 @@ CheckProfilePasswordResult(ProfilePasswordResult result);
 
 bool
 SetProfilePasswordDialog(ProfileMap &map);
+
+/**
+ * Ask for the current password (if any) and then for a new one, and
+ * save the profile.
+ */
+void
+ChangeProfilePassword();

@@ -8,18 +8,24 @@
 #include "ui/canvas/Icon.hpp"
 #include "util/StaticArray.hxx"
 
-struct TabMenuGroup;
+#include <functional>
+#include <memory>
+
+struct TabMenuItem;
 struct DialogLook;
 class PagerWidget;
+class Widget;
 
 /**
  * The tile grid of the configuration menu (the LXNAV "Setup" menu).
- * Each tile opens the first page of its group.
+ * A tile opens a settings page, calls a function or opens a grid of
+ * further tiles (see #TabMenuItem).
  */
 class TabMenuDisplay final : public PaintWindow
 {
-  static constexpr unsigned MAX_TILES = 24;
+  static constexpr unsigned MAX_NODES = 128;
   static constexpr unsigned MAX_PAGES = 64;
+  static constexpr unsigned NONE = ~0u;
 
   /**
    * The offset from a page number in the #TabMenuDisplay to a page
@@ -27,17 +33,25 @@ class TabMenuDisplay final : public PaintWindow
    */
   static constexpr unsigned PAGE_OFFSET = 1;
 
-  struct Tile {
+  /**
+   * A tile.  The tiles of one grid are consecutive; the root node is
+   * the menu itself and its children are the tiles of the main grid.
+   */
+  struct Node {
     const char *caption;
     MaskedIcon icon;
 
-    /** Index of the first/last page of this tile in the pager */
-    unsigned first_page_index, last_page_index;
-  };
+    std::unique_ptr<Widget> (*load)();
+    void (*action)();
 
-  struct PageCaption {
-    const char *caption;
-    unsigned tile;
+    /** Index of the page in the pager, if this tile has a page */
+    unsigned page;
+
+    unsigned parent;
+    unsigned first_child, num_children;
+
+    /** The focused child, if this tile is a grid */
+    unsigned focus;
   };
 
   /** Geometry of the grid; see UpdateLayout() */
@@ -46,40 +60,42 @@ class TabMenuDisplay final : public PaintWindow
     PixelSize tile_size{1, 1};
     int pitch_x = 1, pitch_y = 1;
     int left = 0, top = 0;
-    unsigned content_height = 0;
   };
 
   PagerWidget &pager;
   const DialogLook &look;
 
-  StaticArray<Tile, MAX_TILES> tiles;
-  StaticArray<PageCaption, MAX_PAGES> pages;
+  StaticArray<Node, MAX_NODES> nodes;
+
+  /** The node of each page in the pager */
+  StaticArray<unsigned, MAX_PAGES> page_nodes;
+
+  /** The node whose children are shown */
+  unsigned current = 0;
 
   Metrics metrics;
   Font label_font, title_font;
-  const char *title = nullptr;
 
-  /** The focused tile */
-  unsigned cursor = 0;
-
-  /** Pixels the grid is scrolled up */
+  /** Pixels the grid is scrolled up; a multiple of the row pitch */
   unsigned scroll = 0;
 
   /** The tile under the pointer while the mouse button is down */
-  unsigned down_tile = NO_TILE;
-  static constexpr unsigned NO_TILE = ~0u;
+  unsigned down_tile = NONE;
+
+  std::function<void()> level_callback;
 
 public:
   TabMenuDisplay(PagerWidget &pager, const DialogLook &look) noexcept;
 
   /**
-   * Build the tiles and add their pages to the pager.
+   * Build the menu and add its pages to the pager.
    *
-   * @param title caption of the menu
+   * @param items the tiles of the main grid
+   * @param title caption of the main grid
    */
-  void InitMenu(const TabMenuGroup groups[], unsigned n_groups,
-                const char *title) noexcept;
+  void InitMenu(const TabMenuItem *items, const char *title) noexcept;
 
+  /** The caption of the menu, or of the current page. */
   const char *GetCaption(char buffer[], size_t size) const noexcept;
 
   /**
@@ -88,23 +104,51 @@ public:
    */
   void OnPageFlipped() noexcept;
 
+  /** Called when another grid is shown. */
+  void SetLevelCallback(std::function<void()> callback) noexcept {
+    level_callback = std::move(callback);
+  }
+
+  /** Is a grid shown below the main grid? */
+  bool IsSubGrid() const noexcept {
+    return current != 0;
+  }
+
+  /** Go back to the grid above.  @return false in the main grid */
+  bool LeaveSubGrid() noexcept;
+
+  /** The focused tile of the main grid. */
   void SetCursor(unsigned i) noexcept;
-
   unsigned GetCursor() const noexcept {
-    return cursor;
+    return nodes[0].focus;
   }
 
-  /** Pager index of a page; the menu itself is pager page 0. */
-  static constexpr unsigned PagerIndex(unsigned page_index) noexcept {
-    return PAGE_OFFSET + page_index;
-  }
-
-  /** Pager index of the first page of a tile. */
-  unsigned GetPagerIndex(unsigned tile) const noexcept {
-    return PAGE_OFFSET + tiles[tile].first_page_index;
-  }
+  /** Pager index of the page with the given loader; asserts it exists. */
+  [[gnu::pure]]
+  unsigned FindPage(std::unique_ptr<Widget> (*load)()) const noexcept;
 
 private:
+  void Build(const TabMenuItem *items, unsigned parent) noexcept;
+
+  [[gnu::pure]]
+  unsigned GetNumTiles() const noexcept {
+    return nodes[current].num_children;
+  }
+
+  unsigned &Cursor() noexcept {
+    return nodes[current].focus;
+  }
+
+  [[gnu::pure]]
+  unsigned GetCursorTile() const noexcept {
+    return nodes[current].focus;
+  }
+
+  [[gnu::pure]]
+  const Node &GetTile(unsigned i) const noexcept {
+    return nodes[nodes[current].first_child + i];
+  }
+
   void UpdateLayout() noexcept;
   void LoadFonts() noexcept;
 
@@ -116,12 +160,17 @@ private:
   unsigned GetVisibleRows() const noexcept;
 
   [[gnu::pure]]
+  unsigned GetNumRows() const noexcept;
+
+  [[gnu::pure]]
   PixelRect GetTileRect(unsigned i) const noexcept;
 
   [[gnu::pure]]
   unsigned FindTile(PixelPoint p) const noexcept;
 
-  void Open(unsigned tile) noexcept;
+  void Open(unsigned node) noexcept;
+  void EnterGrid(unsigned node) noexcept;
+  void SetCurrent(unsigned node) noexcept;
   void MoveCursor(int delta) noexcept;
   void SetScroll(int value) noexcept;
   void EnsureVisible(unsigned tile) noexcept;

@@ -7,30 +7,32 @@
 
 class Widget;
 
-struct TabMenuPage {
-  const char *menu_caption;
-
-  std::unique_ptr<Widget> (*Load)();
-
-  /** Called when building the menu; an unavailable page is omitted. */
-  bool (*IsAvailable)() = nullptr;
-};
-
-/** A tile of the menu; opens the first of its pages. */
-struct TabMenuGroup {
+/**
+ * A tile of the configuration menu.  Exactly one of #Load, #Action
+ * and #children says what the tile does.  Tables of items end with an
+ * item without a caption.
+ */
+struct TabMenuItem {
   const char *caption;
 
-  const TabMenuPage *pages;
+  /** Open a settings page. */
+  std::unique_ptr<Widget> (*Load)() = nullptr;
+
+  /** Call a function, e.g. to show a dialog. */
+  void (*Action)() = nullptr;
+
+  /**
+   * Open a grid of further tiles.  A grid with a single available
+   * tile opens that tile directly.
+   */
+  const TabMenuItem *children = nullptr;
+
+  /** Called when building the menu; an unavailable item is omitted. */
+  bool (*IsAvailable)() = nullptr;
 
   /**
    * Base name of the icon resource (e.g. "lx_units"); the tile has
    * no icon if the resource was not built.
    */
   const char *icon = nullptr;
-
-  /**
-   * A tile without pages of its own opens the first page of this
-   * other tile (an index into the group table).
-   */
-  int alias = -1;
 };

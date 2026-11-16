@@ -7,6 +7,8 @@
 #include "Error.hpp"
 #include "Profile/Map.hpp"
 #include "Profile/File.hpp"
+#include "Profile/Current.hpp"
+#include "Profile/Profile.hpp"
 #include "Profile/Keys.hpp"
 #include "Language/Language.hpp"
 #include "system/Path.hpp"
@@ -89,4 +91,14 @@ SetProfilePasswordDialog(ProfileMap &map)
     map.Set(ProfileKeys::Password, new_password);
 
   return true;
+}
+
+void
+ChangeProfilePassword()
+{
+  if (!CheckProfilePasswordResult(CheckProfilePassword(Profile::map)) ||
+      !SetProfilePasswordDialog(Profile::map))
+    return;
+
+  Profile::Save();
 }
