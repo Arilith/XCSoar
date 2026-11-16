@@ -56,10 +56,28 @@ GetInfoBoxDarkMode(const UISettings &settings, bool dark_mode) noexcept
   return dark_mode;
 }
 
+/**
+ * Are the InfoBoxes drawn as the LX navbox strip over the map?  That
+ * needs the LX look and OpenGL, whose alpha blending lets the map
+ * shine through.
+ */
+[[gnu::const]]
+static bool
+IsNavBoxStrip([[maybe_unused]] bool strip_geometry,
+              [[maybe_unused]] bool lx,
+              [[maybe_unused]] bool infobox_dark_mode) noexcept
+{
+#ifdef ENABLE_OPENGL
+  return strip_geometry && lx && infobox_dark_mode;
+#else
+  return false;
+#endif
+}
+
 void
 Look::InitialiseConfigured(const UISettings &settings,
                            const Font &map_font, const Font &map_bold_font,
-                           unsigned infobox_width)
+                           unsigned infobox_width, bool navbox_strip)
 {
   const bool dark_mode = GetDarkMode(settings);
   const bool infobox_dark_mode = GetInfoBoxDarkMode(settings, dark_mode);
@@ -74,7 +92,9 @@ Look::InitialiseConfigured(const UISettings &settings,
   trace_history.Initialise(dark_mode);
   info_box.Initialise(infobox_dark_mode, settings.info_boxes.use_colors,
                       infobox_width,
-                      settings.info_boxes.scale_title_font);
+                      settings.info_boxes.scale_title_font,
+                      IsNavBoxStrip(navbox_strip, dialog.lx,
+                                    infobox_dark_mode));
   vario.Initialise(infobox_dark_mode,
                    settings.info_boxes.use_colors,
                    infobox_width,
@@ -95,14 +115,17 @@ Look::InitialiseConfigured(const UISettings &settings,
 }
 
 void
-Look::ReinitialiseLayout(unsigned infobox_width, unsigned scale_title_font)
+Look::ReinitialiseLayout(unsigned infobox_width, unsigned scale_title_font,
+                         bool navbox_strip)
 {
   /* Fonts and pens follow Layout::.  Reload after a resize, DPI
      change, or Text size change. */
   dialog.LoadFonts();
   horizon.Initialise();
 
-  info_box.ReinitialiseLayout(infobox_width, scale_title_font);
+  info_box.ReinitialiseLayout(infobox_width, scale_title_font,
+                              IsNavBoxStrip(navbox_strip, dialog.lx,
+                                            info_box.inverse));
   vario.ReinitialiseLayout(infobox_width);
   flarm_gauge.ReinitialiseLayout();
   flarm_dialog.ReinitialiseLayout();

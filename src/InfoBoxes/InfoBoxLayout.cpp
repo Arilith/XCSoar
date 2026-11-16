@@ -530,6 +530,24 @@ InfoBoxLayout::ValidateGeometry(InfoBoxSettings::Geometry geometry,
   return geometry;
 }
 
+void
+InfoBoxLayout::MakeOverlay(Layout &layout, unsigned row_height) noexcept
+{
+  layout.overlay = true;
+
+  if (layout.landscape ||
+      layout.geometry != InfoBoxSettings::Geometry::BOTTOM_RIGHT_5 ||
+      row_height >= layout.control_size.height)
+    return;
+
+  const int shrink = int(layout.control_size.height - row_height);
+  for (unsigned i = 0; i < layout.count; ++i)
+    layout.positions[i].top += shrink;
+
+  layout.remaining.bottom += shrink;
+  layout.control_size.height = row_height;
+}
+
 static constexpr unsigned
 CalculateInfoBoxRowHeight(unsigned screen_height,
                           unsigned control_width,

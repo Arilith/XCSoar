@@ -82,5 +82,5 @@ MapLook::Initialise(const MapSettings &settings,
   topography.Initialise();
   airspace.Initialise(settings.airspace, topography.important_label_font);
 
-  overlay.Initialise(font, bold_font);
+  overlay.Initialise(font, bold_font, lx);
 }

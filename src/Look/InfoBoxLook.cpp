@@ -5,6 +5,7 @@
 #include "InfoBoxes/Data.hpp"
 #include "FontDescription.hpp"
 #include "Colors.hpp"
+#include "LXLook.hpp"
 #include "ui/canvas/Features.hpp" // for HAVE_TEXT_CACHE
 #include "Screen/Layout.hpp"
 #include "AutoFont.hpp"
@@ -33,7 +34,8 @@ AutoSizeTargetWidth(unsigned width) noexcept
 
 void
 InfoBoxLook::Initialise(bool _inverse, bool use_colors,
-                        unsigned width, unsigned scale_title_font)
+                        unsigned width, unsigned scale_title_font,
+                        bool _lx)
 {
   inverse = _inverse;
 
@@ -60,7 +62,10 @@ InfoBoxLook::Initialise(bool _inverse, bool use_colors,
     pressed_background_color = DarkColor(pressed_background_color);
   }
 
-  ReinitialiseLayout(width, scale_title_font);
+  if (_lx)
+    focused_background_color = pressed_background_color = LX::SELECTION;
+
+  ReinitialiseLayout(width, scale_title_font, _lx);
 
   colors[0] = COLOR_GRAY;
   if (HasColors() && use_colors) {
@@ -79,9 +84,29 @@ static_assert(sizeof(InfoBoxLook::colors) / sizeof(Color) ==
               InfoBoxData::COLOR_COUNT,
               "InfoBox colour table must match InfoBoxData::COLOR_COUNT");
 
-void
-InfoBoxLook::ReinitialiseLayout(unsigned width, unsigned scale_title_font)
+/** Tahoma regular in the sizes of the LX navbox; there is no bold */
+static void
+LoadLXFonts(InfoBoxLook &look) noexcept
 {
+  const auto load = [](Font &font, unsigned height){
+    font.Load(FontDescription(height));
+  };
+
+  const unsigned value_height = LX::FontSize(LX::NavBox::VALUE_FONT);
+
+  load(look.title_font, LX::FontSize(LX::NavBox::TITLE_FONT));
+  load(look.title_font_bold, LX::FontSize(LX::NavBox::TITLE_FONT));
+  load(look.preview_number_font, LX::FontSize(LX::NavBox::TITLE_FONT));
+  load(look.value_font, value_height);
+  load(look.small_value_font, LX::FontSize(LX::NavBox::SMALL_VALUE_FONT));
+  load(look.unit_font, value_height * LX::NavBox::UNIT_PERCENT / 100);
+}
+
+void
+InfoBoxLook::ReinitialiseLayout(unsigned width, unsigned scale_title_font,
+                                bool _lx)
+{
+  lx = _lx;
   border_width = Layout::ScaleFinePenWidth(1);
 
   Color border_color = COLOR_GRAY;
@@ -96,6 +121,14 @@ InfoBoxLook::ReinitialiseLayout(unsigned width, unsigned scale_title_font)
   preview_radius = Layout::Scale(6);
 
   unit_fraction_pen.Create(Layout::ScaleFinePenWidth(1), value.fg_color);
+
+  if (lx) {
+    LoadLXFonts(*this);
+#ifdef HAVE_TEXT_CACHE
+    TextCache::Flush();
+#endif
+    return;
+  }
 
   FontDescription title_font_d(8);
   /* scale_title_font can exceed 100%. Cap before AutoSizeTargetWidth(),

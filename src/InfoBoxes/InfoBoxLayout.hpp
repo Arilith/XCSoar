@@ -62,6 +62,15 @@ Calculate(PixelRect rc, InfoBoxSettings::Geometry geometry,
           unsigned scale_title_font = 100,
           PixelSize orientation_size = {}) noexcept;
 
+/**
+ * Draw the InfoBoxes of @p layout over the map (see
+ * #Layout::overlay).  A row at the bottom is made @p row_height high:
+ * the overlay needs no space for a comment line.  The remaining
+ * area grows by what the row gives up.
+ */
+void
+MakeOverlay(Layout &layout, unsigned row_height) noexcept;
+
 [[gnu::const]]
 int
 GetBorder(InfoBoxSettings::Geometry geometry, bool landscape,

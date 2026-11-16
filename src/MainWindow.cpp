@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The XCSoar Project
 #include "MainWindow.hpp"
+#include "Look/LXLook.hpp"
 #include "MapWindow/GlueMapWindow.hpp"
 #include "PopupMessage.hpp"
 #include "InfoBoxes/InfoBoxManager.hpp"
@@ -74,6 +75,21 @@ GetActiveInfoBoxGeometry() noexcept
   const InfoBoxSettings &settings = CommonInterface::GetUISettings().info_boxes;
   const unsigned panel_index = CommonInterface::GetUIState().panel_index;
   return settings.ResolveGeometry(settings.panels[panel_index]);
+}
+
+[[gnu::pure]]
+static bool
+IsNavBoxGeometry(const InfoBoxLayout::Layout &layout) noexcept
+{
+  return layout.geometry == InfoBoxSettings::Geometry::BOTTOM_RIGHT_5;
+}
+
+/** Draw the InfoBoxes as the LX navbox strip, if the look asks for it. */
+static void
+ApplyNavBoxStrip(InfoBoxLayout::Layout &layout, const Look &look) noexcept
+{
+  if (look.info_box.lx)
+    InfoBoxLayout::MakeOverlay(layout, LX::Scale(LX::NavBox::ROW_HEIGHT));
 }
 
 /** Size the dial and its labels to the gauge window. */
@@ -756,13 +772,10 @@ MainWindow::InitialiseConfigured()
   assert(look != nullptr);
   look->InitialiseConfigured(CommonInterface::GetUISettings(),
                              Fonts::map, Fonts::map_bold,
-                             ib_layout.control_size.width);
+                             ib_layout.control_size.width,
+                             IsNavBoxGeometry(ib_layout));
 
-#ifdef ENABLE_OPENGL
-  ib_layout.overlay = ib_layout.geometry ==
-    InfoBoxSettings::Geometry::BOTTOM_RIGHT_5 &&
-    look->dialog.lx && look->info_box.inverse;
-#endif
+  ApplyNavBoxStrip(ib_layout, *look);
 
   InfoBoxManager::Create(*this, ib_layout, look->info_box);
   map_rect = infobox_area_rc.Contains(rc) && !ib_layout.overlay
@@ -1006,13 +1019,11 @@ MainWindow::ReinitialiseLayout() noexcept
 
   ib_layout.outer_border = GetOuterBorder(infobox_area_rc, rc);
 
-  look->ReinitialiseLayout(ib_layout.control_size.width, ui_settings.info_boxes.scale_title_font);
+  look->ReinitialiseLayout(ib_layout.control_size.width,
+                           ui_settings.info_boxes.scale_title_font,
+                           IsNavBoxGeometry(ib_layout));
 
-#ifdef ENABLE_OPENGL
-  ib_layout.overlay = ib_layout.geometry ==
-    InfoBoxSettings::Geometry::BOTTOM_RIGHT_5 &&
-    look->dialog.lx && look->info_box.inverse;
-#endif
+  ApplyNavBoxStrip(ib_layout, *look);
 
   InfoBoxManager::Create(*this, ib_layout, look->info_box);
   InfoBoxManager::ProcessTimer();
@@ -1201,7 +1212,8 @@ MainWindow::ReinitialiseLook() noexcept
   assert(look != nullptr);
   look->InitialiseConfigured(CommonInterface::GetUISettings(),
                              Fonts::map, Fonts::map_bold,
-                             ib_layout.control_size.width);
+                             ib_layout.control_size.width,
+                             IsNavBoxGeometry(ib_layout));
 
   /* InitialiseConfigured fits the dial to an InfoBox. Size it to the
      gauge that is actually on screen. */

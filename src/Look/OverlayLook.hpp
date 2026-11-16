@@ -18,5 +18,12 @@ struct OverlayLook {
   Pen crosshair_pen;
   Pen crosshair_pen_alias;
 
-  void Initialise(const Font &font, const Font &bold_font);
+  /** Draw the LX scale bracket instead of the XCSoar scale bar. */
+  bool lx = false;
+
+  /** The number above the LX scale bracket */
+  Font scale_font;
+
+  void Initialise(const Font &font, const Font &bold_font,
+                  bool lx = false);
 };

@@ -15,6 +15,13 @@ struct InfoBoxLook {
 
   bool inverse;
 
+  /**
+   * The LX navbox look: Tahoma regular, no bold, no borders.  Only
+   * set for the translucent strip over the map (see
+   * #InfoBoxLayout::Layout::overlay).
+   */
+  bool lx = false;
+
   Pen border_pen;
   Color background_color, focused_background_color, pressed_background_color;
 
@@ -57,9 +64,11 @@ struct InfoBoxLook {
   Color colors[7];
 
   void Initialise(bool inverse, bool use_colors,
-                  unsigned width, unsigned scale_title_font);
+                  unsigned width, unsigned scale_title_font,
+                  bool lx = false);
 
-  void ReinitialiseLayout(unsigned width, unsigned scale_title_font);
+  void ReinitialiseLayout(unsigned width, unsigned scale_title_font,
+                          bool lx = false);
 
   /** Colour of the long-press fill on an InfoBox or arrange card. */
   [[gnu::pure]]

@@ -185,10 +185,45 @@ static constexpr Palette RED{{0xd8, 0x43, 0x30}, {0x8e, 0x26, 0x1a},
 
 } // namespace Badge
 
-/** Backdrop of the translucent map InfoBox strip. */
+/**
+ * The navboxes: the InfoBox strip over the bottom of the map.  A
+ * navbox is a small title above a large value, with the unit right
+ * behind the value.
+ */
 namespace NavBox {
-static constexpr uint8_t BACKDROP_ALPHA = 180;
-}
+
+/** Black translucent band behind all boxes (measured: 68% black) */
+static constexpr uint8_t BACKDROP_ALPHA = 175;
+
+static constexpr unsigned ROW_HEIGHT = 51;
+
+/** Text sizes (em height); the unit is a percentage of the value */
+static constexpr unsigned TITLE_FONT = 14;
+static constexpr unsigned VALUE_FONT = 32;
+static constexpr unsigned SMALL_VALUE_FONT = 24;
+static constexpr unsigned UNIT_PERCENT = 60;
+
+/** Text baselines, from the top of the band */
+static constexpr unsigned TITLE_BASELINE = 12;
+static constexpr unsigned VALUE_BASELINE = 46;
+
+} // namespace NavBox
+
+/** What is drawn on the map above the navboxes */
+namespace MapChrome {
+
+/** The scale: a bracket of a round length with its number above */
+static constexpr Color SCALE = COLOR_BLACK;
+static constexpr unsigned SCALE_MAX_WIDTH = 100;
+static constexpr unsigned SCALE_TICK = 6;
+static constexpr unsigned SCALE_PEN = 2;
+static constexpr unsigned SCALE_FONT = 14;
+static constexpr unsigned SCALE_MARGIN = 14;
+
+/** Distance between the bracket and the bottom of the HUD */
+static constexpr unsigned SCALE_BOTTOM = 2;
+
+} // namespace MapChrome
 
 /**
  * The on-screen keyboard: a panel of 10 x 5 cells, each cell holding

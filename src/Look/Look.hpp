@@ -53,7 +53,13 @@ struct Look {
   void Initialise(const Font &map_font);
   void InitialiseConfigured(const UISettings &settings,
                             const Font &map_font, const Font &map_bold_font,
-                            unsigned infobox_width);
+                            unsigned infobox_width,
+                            bool navbox_strip = false);
 
-  void ReinitialiseLayout(unsigned infobox_width, unsigned scale_title_font);
+  /**
+   * @param navbox_strip the active InfoBox geometry is the one that
+   * may be drawn as the LX navbox strip over the map
+   */
+  void ReinitialiseLayout(unsigned infobox_width, unsigned scale_title_font,
+                          bool navbox_strip = false);
 };

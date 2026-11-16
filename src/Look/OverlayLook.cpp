@@ -4,10 +4,16 @@
 #include "OverlayLook.hpp"
 #include "Screen/Layout.hpp"
 #include "Resources.hpp"
+#include "FontDescription.hpp"
+#include "LXLook.hpp"
 
 void
-OverlayLook::Initialise([[maybe_unused]] const Font &font, const Font &bold_font)
+OverlayLook::Initialise([[maybe_unused]] const Font &font,
+                        const Font &bold_font, bool _lx)
 {
+  lx = _lx;
+  if (lx)
+    scale_font.Load(FontDescription(LX::FontSize(LX::MapChrome::SCALE_FONT)));
   map_scale_left_icon.LoadResource(IDB_MAPSCALE_LEFT_ALL, false);
   map_scale_right_icon.LoadResource(IDB_MAPSCALE_RIGHT_ALL, false);
   contour_spacing_icon.LoadResource(IDB_CONTOUR_SPACING_ALL, false);

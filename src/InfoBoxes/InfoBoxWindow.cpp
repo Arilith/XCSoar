@@ -138,6 +138,10 @@ InfoBoxWindow::PaintValue(Canvas &canvas, [[maybe_unused]] Color background_colo
   const PixelSize value_unit_size = value_size + PixelSize{unit_width, 0u};
 
   auto value_p = value_rect.CenteredTopLeft(value_unit_size);
+  if (overlay)
+    /* every navbox has its value on the same baseline, whichever
+       font fits */
+    value_p.y = int(LX::Scale(LX::NavBox::VALUE_BASELINE)) - ascent_height;
   if (value_p.x < 0)
     value_p.x = 0;
 
@@ -159,7 +163,8 @@ InfoBoxWindow::PaintValue(Canvas &canvas, [[maybe_unused]] Color background_colo
 void
 InfoBoxWindow::PaintComment(Canvas &canvas)
 {
-  if (data.comment.empty())
+  /* a navbox has a title and a value only */
+  if (data.comment.empty() || overlay)
     return;
 
   canvas.SetTextColor(look.GetCommentColor(data.comment_color));
@@ -193,6 +198,9 @@ InfoBoxWindow::Paint(Canvas &canvas)
     const ScopeAlphaBlend blend;
     canvas.DrawFilledRectangle(rc, background_color);
 #endif
+  } else if (overlay) {
+    /* the navbox selection is a flat fill */
+    canvas.DrawFilledRectangle(rc, background_color);
   } else if (settings.border_style == InfoBoxSettings::BorderStyle::GLASS)
     DrawGlassBackground(canvas, rc, background_color);
   else
@@ -392,10 +400,16 @@ InfoBoxWindow::OnResize(PixelSize new_size) noexcept
     rc.bottom -= look.border_width;
 
   title_rect = rc;
-  title_rect.bottom = rc.top + look.title_font.GetHeight();
+  if (overlay)
+    /* put the baseline of the title where the LX has it */
+    title_rect.top = rc.top + int(LX::Scale(LX::NavBox::TITLE_BASELINE)) -
+      int(look.title_font.GetAscentHeight());
+  title_rect.bottom = title_rect.top + look.title_font.GetHeight();
 
   comment_rect = rc;
-  comment_rect.top = comment_rect.bottom - look.title_font.GetHeight();
+  comment_rect.top = overlay
+    ? comment_rect.bottom
+    : comment_rect.bottom - look.title_font.GetHeight();
 
   value_rect = rc;
   value_rect.top = title_rect.bottom;

@@ -9,6 +9,11 @@
 #include "Look/OverlayLook.hpp"
 #include "util/StaticString.hxx"
 #include "Formatter/UserUnits.hpp"
+#include "Units/Units.hpp"
+#include "Look/LXLook.hpp"
+#include "ui/canvas/Pen.hpp"
+
+#include <cmath>
 
 unsigned
 GetMapScaleBandHeight(const Font &font) noexcept
@@ -23,6 +28,60 @@ GetMapScaleAndTitleClearance(const Font &font) noexcept
     + font.GetHeight() + Layout::GetTextPadding();
 }
 
+/** The largest 1, 2 or 5 times a power of ten not above @p value */
+[[gnu::const]]
+static double
+RoundDown125(double value) noexcept
+{
+  const double magnitude = std::pow(10., std::floor(std::log10(value)));
+  const double mantissa = value / magnitude;
+  return magnitude * (mantissa >= 5 ? 5 : mantissa >= 2 ? 2 : 1);
+}
+
+/**
+ * The LX scale: a bracket of a round length in user units, with its
+ * number above, at the bottom right of @p rc.
+ */
+static void
+RenderLXMapScale(Canvas &canvas, const WindowProjection &projection,
+                 const PixelRect &rc, const OverlayLook &look) noexcept
+{
+  namespace Chrome = LX::MapChrome;
+
+  const double max_length =
+    Units::ToUserDistance(projection.DistancePixelsToMeters(
+                            LX::Scale(Chrome::SCALE_MAX_WIDTH)));
+  if (max_length <= 0)
+    return;
+
+  const double length = RoundDown125(max_length);
+  const int width = int(projection.DistanceMetersToPixels(
+                          Units::ToSysDistance(length)));
+
+  const int right = rc.right - int(LX::Scale(Chrome::SCALE_MARGIN));
+  const int left = right - width;
+  const int y = rc.bottom - int(LX::Scale(Chrome::SCALE_BOTTOM));
+  const int tick = int(LX::Scale(Chrome::SCALE_TICK));
+
+  canvas.Select(Pen(LX::Scale(Chrome::SCALE_PEN), Chrome::SCALE));
+  canvas.DrawLine({left, y - tick}, {left, y});
+  canvas.DrawLine({left, y}, {right, y});
+  canvas.DrawLine({right, y}, {right, y - tick});
+
+  StaticString<16> text;
+  text.Format("%g", length);
+
+  canvas.Select(look.scale_font);
+  canvas.SetBackgroundTransparent();
+  canvas.SetTextColor(Chrome::SCALE);
+
+  /* the baseline of the number sits just above the bracket */
+  const PixelSize size = canvas.CalcTextSize(text);
+  canvas.DrawText({(left + right - int(size.width)) / 2,
+                   y - int(LX::Scale(Chrome::SCALE_PEN) +
+                           look.scale_font.GetAscentHeight())}, text);
+}
+
 void
 RenderMapScale(Canvas &canvas,
                const WindowProjection& projection,
@@ -32,6 +91,11 @@ RenderMapScale(Canvas &canvas,
 {
   if (!projection.IsValid())
     return;
+
+  if (look.lx) {
+    RenderLXMapScale(canvas, projection, rc, look);
+    return;
+  }
 
   StaticString<80> buffer;
 
