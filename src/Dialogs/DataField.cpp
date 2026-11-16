@@ -96,8 +96,12 @@ EditDataFieldDialog(const char *caption, DataField &df,
     assert(value != nullptr);
 
     PrefixDataField::AllowedCharactersFunction acf;
-    if (type == DataField::Type::PREFIX)
+    PrefixDataField::SuggestionsFunction suggestions;
+    if (type == DataField::Type::PREFIX) {
       acf = static_cast<PrefixDataField &>(sdf).GetAllowedCharactersFunction();
+      suggestions =
+        static_cast<PrefixDataField &>(sdf).GetSuggestionsFunction();
+    }
 
 #ifdef ANDROID
     if (!acf) {
@@ -119,7 +123,8 @@ EditDataFieldDialog(const char *caption, DataField &df,
 
     static constexpr unsigned MAX_TEXTENTRY_SIZE = 512;
     StaticString<MAX_TEXTENTRY_SIZE> buffer(value);
-    if (!TextEntryDialog(buffer, caption, acf))
+    if (!TextEntryDialog(buffer.data(), buffer.capacity(), caption, acf,
+                         true, suggestions))
       return false;
 
     sdf.ModifyValue(buffer);

@@ -7,6 +7,8 @@ Version 7.47 - not yet released
   - remember QNH and the maximum forecast temperature with that
     same question
 * ui
+  - show live waypoint-name suggestions in the LX-style keyboard and
+    let pilots complete a name or choose a suggestion
   - add cursor keys to the LX-style on-screen keyboard so text can
     be edited at the insertion point
   - redesign the startup profile picker after the LXNAV LX9000: the
@@ -105,6 +107,7 @@ Version 7.47 - not yet released
     login (wrong e-mail or password, subscription not active, too
     many devices) instead of "Loading SkySight catalog..." #2860
 * documentation
+  - describe live waypoint suggestions and completion
   - describe the LX-style keyboard cursor keys
   - describe the Configuration grid and dark-mode control feedback
   - describe the MacCready InfoBox speed-to-fly comment as true

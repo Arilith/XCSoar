@@ -20,10 +20,12 @@
 #include "Waypoint/WaypointListBuilder.hpp"
 #include "Waypoint/WaypointFilter.hpp"
 #include "Waypoint/Waypoints.hpp"
+#include "Waypoint/Waypoint.hpp"
 #include "Engine/Task/Ordered/OrderedTask.hpp"
 #include "Engine/Task/Ordered/Points/OrderedTaskPoint.hpp"
 #include "Form/DataField/Enum.hpp"
 #include "util/StringPointer.hxx"
+#include "util/StringCompare.hxx"
 #include "util/AllocatedString.hxx"
 #include "util/ScopeExit.hxx"
 #include "UIGlobals.hpp"
@@ -44,6 +46,7 @@
 
 #include <algorithm>
 #include <list>
+#include <unordered_set>
 
 #include <cassert>
 #include <stdio.h>
@@ -204,6 +207,10 @@ public:
 
   void UpdateList();
 
+  const char *SuggestCharacters(const char *input) const;
+  void SuggestNames(const char *input,
+                    std::vector<std::string> &results) const;
+
   virtual void OnWaypointListEnter();
 
   /**
@@ -284,13 +291,13 @@ public:
 class WaypointFilterWidget : public RowFormWidget {
   Angle last_heading;
 
-  DataFieldListener *listener;
+  WaypointListWidget *listener;
 
 public:
   WaypointFilterWidget(const DialogLook &look, Angle _heading)
     :RowFormWidget(look, true), last_heading(_heading) {}
 
-  void SetListener(DataFieldListener *_listener) {
+  void SetListener(WaypointListWidget *_listener) {
     listener = _listener;
   }
 
@@ -424,6 +431,78 @@ FillTaskWaypointsList(WaypointList &list, const OrderedTask &task)
   }
 }
 
+static bool
+MatchesSuggestionFilter(const Waypoint &waypoint, const WaypointFilter &filter,
+                        GeoPoint location,
+                        const FAITrianglePointValidator &validator,
+                        const std::unordered_set<unsigned> *recent) noexcept
+{
+  return (recent == nullptr || recent->find(waypoint.id) != recent->end()) &&
+    filter.MatchesAll(waypoint, location, validator);
+}
+
+const char *
+WaypointListWidget::SuggestCharacters(const char *input) const
+{
+  WaypointFilter filter;
+  dialog_state.ToFilter(filter, last_heading);
+  filter.name.clear();
+  if (filter.type_index == TypeFilter::LAST_USED)
+    filter.type_index = TypeFilter::ALL;
+  const FAITrianglePointValidator validator(ordered_task, ordered_task_index);
+  std::unordered_set<unsigned> recent;
+  if (dialog_state.IsLastUsed()) {
+    const auto &ids = LastUsedWaypoints::GetList();
+    recent.insert(ids.begin(), ids.end());
+  }
+  const auto *recent_filter = dialog_state.IsLastUsed() ? &recent : nullptr;
+  static char buffer[256];
+  return way_points.SuggestNameSubstring(
+    input, buffer, ARRAY_SIZE(buffer), [&](const Waypoint &waypoint) noexcept {
+      return MatchesSuggestionFilter(waypoint, filter, location, validator,
+                                     recent_filter);
+    });
+}
+
+void
+WaypointListWidget::SuggestNames(const char *input,
+                                 std::vector<std::string> &results) const
+{
+  WaypointFilter filter;
+  dialog_state.ToFilter(filter, last_heading);
+  filter.name.clear();
+  if (filter.type_index == TypeFilter::LAST_USED)
+    filter.type_index = TypeFilter::ALL;
+  const FAITrianglePointValidator validator(ordered_task, ordered_task_index);
+  std::unordered_set<unsigned> recent;
+  if (dialog_state.IsLastUsed()) {
+    const auto &ids = LastUsedWaypoints::GetList();
+    recent.insert(ids.begin(), ids.end());
+  }
+  const auto *recent_filter = dialog_state.IsLastUsed() ? &recent : nullptr;
+  constexpr std::size_t limit = 10;
+  const auto compare = [input](const std::string &a, const std::string &b) {
+    const bool a_prefix = StringStartsWithIgnoreCase(a, input);
+    const bool b_prefix = StringStartsWithIgnoreCase(b, input);
+    return a_prefix != b_prefix ? a_prefix : a < b;
+  };
+  way_points.VisitNameSubstring(input, [&](const WaypointPtr &waypoint){
+    if (!MatchesSuggestionFilter(*waypoint, filter, location, validator,
+                                 recent_filter))
+      return;
+    const auto &name = waypoint->name;
+    auto position = std::lower_bound(results.begin(), results.end(), name,
+                                     compare);
+    if (position != results.end() && *position == name)
+      return;
+    if (position == results.end() && results.size() == limit)
+      return;
+    results.insert(position, name);
+    if (results.size() > limit)
+      results.pop_back();
+  });
+}
+
 
 void
 WaypointListWidget::UpdateList()
@@ -472,7 +551,7 @@ WaypointListWidget::Prepare(ContainerWindow &parent,
 }
 
 static DataField *
-CreateNameDataField(Waypoints &waypoints, DataFieldListener *listener)
+CreateNameDataField(WaypointListWidget *listener)
 {
   /* Substring search variant of the on-screen-keyboard hint:
      enable only those keys that, when appended to the current
@@ -480,11 +559,13 @@ CreateNameDataField(Waypoints &waypoints, DataFieldListener *listener)
      waypoint's name or shortname.  When nothing matches, the
      callback returns nullptr and the keyboard re-enables every
      key so the user can backspace and try again. */
-  return new PrefixDataField("", [&waypoints](const char *input){
-    static char buffer[256];
-    return waypoints.SuggestNameSubstring(input, buffer,
-                                          ARRAY_SIZE(buffer));
+  auto *field = new PrefixDataField("", [listener](const char *input){
+    return listener->SuggestCharacters(input);
   }, listener);
+  field->SetSuggestionsFunction([listener](const char *input, auto &results){
+    listener->SuggestNames(input, results);
+  });
+  return field;
 }
 
 static DataField *
@@ -573,7 +654,7 @@ void
 WaypointFilterWidget::Prepare([[maybe_unused]] ContainerWindow &parent,
                               [[maybe_unused]] const PixelRect &rc) noexcept
 {
-  Add(_("Name"), nullptr, CreateNameDataField(*data_components->waypoints, listener));
+  Add(_("Name"), nullptr, CreateNameDataField(listener));
   Add(_("Distance"), nullptr, CreateDistanceDataField(listener));
   Add(_("Direction"), nullptr, CreateDirectionDataField(listener, last_heading));
   Add(_("Type"), nullptr,

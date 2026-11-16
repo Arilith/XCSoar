@@ -60,6 +60,7 @@ protected:
    * moving between on-screen key buttons with the hardware cursor keys.
    */
   ContainerWindow *parent_container = nullptr;
+  Window *upper_focus_target = nullptr;
 
   /**
    * When @c KEY_UP moves from the number row to the on-screen backspace, we
@@ -107,6 +108,10 @@ public:
    * a fallback when Space is unavailable.
    */
   bool FocusFirstEnabledInGrid() noexcept;
+
+  void SetUpperFocusTarget(Window *target) noexcept {
+    upper_focus_target = target;
+  }
 
 private:
   void PrepareSize(const PixelRect &rc) noexcept;

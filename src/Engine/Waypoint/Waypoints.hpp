@@ -347,9 +347,10 @@ public:
    * Cost: O(N * avg_name_length) per call.  Suitable for
    * per-keystroke updates.
    */
-  [[gnu::pure]]
   char *SuggestNameSubstring(std::string_view input,
-                             char *dest, size_t max_length) const noexcept;
+                             char *dest, size_t max_length,
+                             const std::function<bool(const Waypoint &)> &
+                               predicate = {}) const noexcept;
 
   /**
    * Looks up nearest waypoint to the search location.

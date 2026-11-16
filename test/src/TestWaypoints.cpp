@@ -413,6 +413,18 @@ TestSuggestNameSubstring()
                                                         ARRAY_SIZE(buffer));
   ok1(after_eu != nullptr);
   ok1(after_eu[0] == '\0');
+
+  /* Other waypoint filters must constrain keyboard hints too. */
+  const auto only_diana = [](const Waypoint &wp) noexcept {
+    return wp.name == "DIANA";
+  };
+  const char *filtered = waypoints.SuggestNameSubstring(
+    "DI", buffer, ARRAY_SIZE(buffer), only_diana);
+  ok1(filtered != nullptr);
+  ok1(SuggestionContains(filtered, 'A'));
+  ok1(!SuggestionContains(filtered, 'T'));
+  ok1(waypoints.SuggestNameSubstring("DIT", buffer, ARRAY_SIZE(buffer),
+                                    only_diana) == nullptr);
 }
 
 static void
@@ -601,7 +613,7 @@ main(int argc, char** argv)
   if (!ParseArgs(argc, argv))
     return 0;
 
-  plan_tests(52 + 9 + 6 + 17 + 6 + 20);
+  plan_tests(52 + 9 + 6 + 17 + 6 + 20 + 4);
 
   Waypoints waypoints;
   GeoPoint center(Angle::Degrees(51.4), Angle::Degrees(7.85));

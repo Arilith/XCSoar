@@ -7,6 +7,7 @@
 #include "ui/dim/Rect.hpp"
 
 #include <string>
+#include <string_view>
 #include <optional>
 
 struct DialogLook;
@@ -41,6 +42,7 @@ public:
 
   /** Byte offset of the insertion point, when used as a text editor. */
   std::optional<std::size_t> text_cursor;
+  std::string text_completion;
 
   DataField *data_field = nullptr;
 
@@ -181,6 +183,11 @@ public:
 
   void SetTextCursor(std::size_t position) noexcept {
     text_cursor = position;
+    Invalidate();
+  }
+
+  void SetTextCompletion(std::string_view completion) noexcept {
+    text_completion = completion;
     Invalidate();
   }
 

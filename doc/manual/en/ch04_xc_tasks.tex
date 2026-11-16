@@ -224,7 +224,8 @@ right, matching all of the filtering conditions set.
 There are several filters available, which may be used together,
 individually or not at all.
 \begin{description}
-\item[Name] Selects waypoints, starting with the string typed.
+\item[Name] Selects waypoints containing the text typed in their name or
+  short name.
 \item[Distance] Filters out waypoints farther than a specified distance from the
   aircraft.
 \item[Direction] Filters out waypoints that are not in a specified direction
@@ -240,6 +241,15 @@ were selected as Goto target, the most recent first.
 \end{description}
 The filters are kept when the selector is opened again.  Waypoint
 selections from other dialogues do not change them.
+
+In the dark LX-style keyboard, the Name field shows up to ten matching
+waypoint names while you type.  The other filters also apply to these
+suggestions and to the enabled keys.  Tap a suggestion, or select it
+with the cursor keys and press Enter, to put its name in the field.
+When a grey completion is shown, the keyboard's right-arrow key accepts
+it at the end of the text.  Press OK to apply the name filter, or
+Cancel to leave it unchanged.  Choosing a suggestion does not start
+navigation.
 
 The Left-Up gesture opens the same dialogue with the title Recently
 used waypoints.  It lists the same waypoints as the type

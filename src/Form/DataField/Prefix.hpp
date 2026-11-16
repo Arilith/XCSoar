@@ -6,13 +6,18 @@
 #include "String.hpp"
 
 #include <functional>
+#include <string>
+#include <vector>
 
 class PrefixDataField final : public DataFieldString {
 public:
   typedef std::function<const char *(const char *)> AllowedCharactersFunction;
+  using SuggestionsFunction =
+    std::function<void(const char *, std::vector<std::string> &)>;
 
 private:
   AllowedCharactersFunction allowed_characters;
+  SuggestionsFunction suggestions;
 
 public:
   PrefixDataField(const char *value,
@@ -27,6 +32,14 @@ public:
 
   const AllowedCharactersFunction &GetAllowedCharactersFunction() const noexcept {
     return allowed_characters;
+  }
+
+  void SetSuggestionsFunction(SuggestionsFunction value) noexcept {
+    suggestions = std::move(value);
+  }
+
+  const SuggestionsFunction &GetSuggestionsFunction() const noexcept {
+    return suggestions;
   }
 
   /* virtual methods from class DataField */

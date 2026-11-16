@@ -299,7 +299,9 @@ CollectFollowingChars(const char *haystack, const char *needle,
 char *
 Waypoints::SuggestNameSubstring(std::string_view input,
                                 char *dest,
-                                size_t max_length) const noexcept
+                                size_t max_length,
+                                const std::function<bool(const Waypoint &)> &
+                                  predicate) const noexcept
 {
   if (max_length == 0)
     return nullptr;
@@ -331,6 +333,8 @@ Waypoints::SuggestNameSubstring(std::string_view input,
   };
 
   for (const auto &wp : waypoint_tree) {
+    if (predicate && !predicate(*wp))
+      continue;
     scan(wp->name);
     if (!wp->shortname.empty())
       scan(wp->shortname);

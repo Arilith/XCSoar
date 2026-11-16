@@ -6,13 +6,18 @@
 #include "util/StringBuffer.hxx"
 
 #include <functional>
+#include <string>
+#include <vector>
 typedef std::function<const char *(const char *)> AllowedCharacters;
+using TextEntrySuggestions =
+  std::function<void(const char *, std::vector<std::string> &)>;
 
 bool
 TextEntryDialog(char *text, size_t size,
                 const char *caption=nullptr,
                 AllowedCharacters ac=AllowedCharacters(),
-                bool default_shift_state = true);
+                bool default_shift_state = true,
+                TextEntrySuggestions suggestions = {});
 
 template<size_t N>
 static inline bool
@@ -50,4 +55,5 @@ TouchTextEntry(char *text, size_t size,
                const char *caption=nullptr,
                AllowedCharacters ac=AllowedCharacters(),
                bool default_shift_state = true,
-               bool use_system_keyboard = false);
+               bool use_system_keyboard = false,
+               TextEntrySuggestions suggestions = {});

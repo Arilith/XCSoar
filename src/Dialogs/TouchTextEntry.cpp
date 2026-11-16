@@ -8,6 +8,7 @@
 #include "Form/Edit.hpp"
 #include "Form/ButtonPanel.hpp"
 #include "Look/LXLook.hpp"
+#include "Look/FontDescription.hpp"
 #include "Widget/LXKeyboardLayout.hpp"
 #include "Widget/KeyboardWidget.hpp"
 #include "Asset.hpp"
@@ -22,6 +23,8 @@
 #include "util/TruncateString.hpp"
 #include "util/UTF8.hpp"
 #include "ui/window/Window.hpp"
+#include "ui/control/List.hpp"
+#include "ui/canvas/Canvas.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -33,6 +36,7 @@ struct TextEntryLayout {
   PixelRect paste;
   PixelRect backspace;
   PixelRect keyboard;
+  PixelRect suggestions;
   PixelRect ok, cancel, clear;
 };
 
@@ -128,13 +132,23 @@ BackspaceCaption(const ButtonLook &look) noexcept
  * @param rc the client area above the soft keys
  */
 static void
-ComputeLXTextEntryLayout(const PixelRect &rc, TextEntryLayout &o) noexcept
+ComputeLXTextEntryLayout(const PixelRect &rc, bool suggestions,
+                         TextEntryLayout &o) noexcept
 {
   o.keyboard = LX::Keyboard::GetPanelRect(rc);
 
   const int top = rc.top + int(LX::Scale(LX::Keyboard::EDITOR_TOP));
   o.editor = {o.keyboard.left, top, o.keyboard.right,
               top + int(LX::Scale(LX::Keyboard::EDITOR_HEIGHT))};
+  if (suggestions && o.keyboard.top - rc.top > int(LX::Scale(300))) {
+    o.editor.left = rc.left + int(LX::Scale(6));
+    o.editor.right = rc.right - int(LX::Scale(6));
+    o.suggestions = {o.editor.left, o.editor.bottom + int(LX::Scale(4)),
+                     o.editor.right, o.keyboard.top - int(LX::Scale(8))};
+  } else if (suggestions) {
+    o.suggestions = {o.editor.left, o.editor.bottom, o.editor.right,
+                     std::max(o.editor.bottom + 1, o.keyboard.top)};
+  }
 }
 } // namespace
 
@@ -157,6 +171,97 @@ static constexpr size_t MAX_TEXTENTRY = 256;
 static unsigned int cursor = 0;
 static size_t max_width;
 static char edittext[MAX_TEXTENTRY];
+
+static void ChooseSuggestion(const char *value);
+
+class SuggestionList final : public ListItemRenderer,
+                             public ListCursorHandler {
+  Font font;
+  TextEntrySuggestions find;
+  std::vector<std::string> matches;
+  PixelRect bounds;
+
+public:
+  ListControl list;
+
+  SuggestionList(ContainerWindow &parent, const DialogLook &_look,
+                 const PixelRect &rc, TextEntrySuggestions _find)
+    :find(std::move(_find)), bounds(rc), list(_look)
+  {
+    font.Load(FontDescription(LX::FontSize(20), true));
+    WindowStyle style;
+    style.TabStop();
+    list.Create(parent, rc, style,
+                std::max(LX::Scale(24), font.GetHeight()));
+    list.SetItemRenderer(this);
+    list.SetCursorHandler(this);
+    list.SetActivateOnFirstClick(true);
+  }
+
+  void Update(const char *text) {
+    matches.clear();
+    find(text, matches);
+    list.SetLength(std::max(1u, unsigned(matches.size())));
+    if (!matches.empty())
+      list.SetCursorIndex(0);
+    list.SetOrigin(0);
+    Move(bounds);
+    if (!list.IsVisible())
+      list.Show();
+    list.Invalidate();
+  }
+
+  void Move(PixelRect rc) noexcept {
+    bounds = rc;
+    const int height = int(std::max<std::size_t>(1, matches.size())) *
+      int(list.GetItemHeight());
+    rc.bottom = std::min(rc.bottom, rc.top + std::max(1, height));
+    const auto current = list.GetPosition();
+    if (current.left != rc.left || current.top != rc.top ||
+        current.right != rc.right || current.bottom != rc.bottom)
+      list.Move(rc);
+  }
+
+  std::string_view Completion(const char *text) const noexcept {
+    if (*text == 0)
+      return {};
+    const std::string_view prefix{text};
+    for (const auto &name : matches)
+      if (StringStartsWithIgnoreCase(name, prefix))
+        return std::string_view{name}.substr(prefix.size());
+    return {};
+  }
+
+  bool HasMatches() const noexcept { return !matches.empty(); }
+
+  void OnPaintItem(Canvas &canvas, const PixelRect rc,
+                   unsigned index) noexcept override {
+    if (!list.HasFocus() || list.GetCursorIndex() != index)
+      canvas.DrawFilledRectangle(rc, COLOR_BLACK);
+    canvas.Select(font);
+    canvas.SetBackgroundTransparent();
+    canvas.SetTextColor(COLOR_WHITE);
+    const int y = rc.top + (int(rc.GetHeight()) -
+                            int(font.GetHeight())) / 2;
+    canvas.DrawClippedText({rc.left + int(LX::Scale(2)), y},
+                           rc.GetWidth() - LX::Scale(2),
+                           matches.empty() ? _("No Match!")
+                                           : matches[index].c_str());
+  }
+
+  bool CanActivateItem(unsigned index) const noexcept override {
+    return index < matches.size();
+  }
+
+  void OnActivateItem(unsigned index) noexcept override {
+    if (index < matches.size()) {
+      const std::string selected = matches[index];
+      ChooseSuggestion(selected.c_str());
+    }
+  }
+};
+
+static SuggestionList *suggestion_list = nullptr;
 
 static const char *
 GetAllowedCharacters()
@@ -206,10 +311,29 @@ static void
 UpdateTextboxProp()
 {
   editor->SetText(edittext);
+  if (suggestion_list != nullptr) {
+    suggestion_list->Update(edittext);
+    if (kb != nullptr)
+      kb->SetUpperFocusTarget(!suggestion_list->HasMatches()
+                              ? nullptr : &suggestion_list->list);
+    editor->SetTextCompletion(cursor == strlen(edittext)
+                              ? suggestion_list->Completion(edittext)
+                              : std::string_view{});
+  }
   if (editor->look.lx)
     editor->SetTextCursor(cursor);
 
   UpdateAllowedCharacters();
+  if (suggestion_list != nullptr && textentry_client != nullptr)
+    textentry_client->Invalidate();
+}
+
+static void
+ChooseSuggestion(const char *value)
+{
+  CopyTruncateString(edittext, max_width, value);
+  cursor = strlen(edittext);
+  UpdateTextboxProp();
 }
 
 static unsigned
@@ -271,8 +395,18 @@ MoveCursorLeft()
 static void
 MoveCursorRight()
 {
-  if (edittext[cursor] == 0)
+  if (edittext[cursor] == 0) {
+    if (suggestion_list != nullptr) {
+      const auto completion = suggestion_list->Completion(edittext);
+      if (!completion.empty()) {
+        CopyTruncateString(edittext + cursor, max_width - cursor,
+                           completion.data());
+        cursor = strlen(edittext);
+        UpdateTextboxProp();
+      }
+    }
     return;
+  }
   const auto length = SequenceLengthUTF8(edittext + cursor);
   if (length == 0)
     return;
@@ -305,6 +439,14 @@ OnPaste()
 static bool
 FormKeyDown(unsigned key_code)
 {
+  if (suggestion_list != nullptr && textentry_client != nullptr &&
+      textentry_client->GetFocusedWindow() == &suggestion_list->list) {
+    if (key_code == KEY_DOWN && kb != nullptr &&
+        suggestion_list->list.GetCursorIndex() + 1 >=
+          suggestion_list->list.GetLength())
+      return kb->FocusFirstEnabledInGrid();
+    return false;
+  }
   /* iOS sends Return as a keyboard event while its system keyboard is
      visible.  Accept the entry there, but let a hardware keyboard's
      Return activate the focused button. */
@@ -424,7 +566,7 @@ TouchTextEntry(char *text, size_t width,
                const char *caption,
                AllowedCharacters accb,
                bool default_shift_state,
-               bool use_system_keyboard)
+               bool use_system_keyboard, TextEntrySuggestions suggestions)
 {
   if (width == 0)
     width = MAX_TEXTENTRY;
@@ -451,6 +593,7 @@ TouchTextEntry(char *text, size_t width,
   /* the LX look has the actions as soft keys and the clear and
      backspace keys on the keyboard */
   const bool lx_keys = look.lx && !system_keyboard;
+  const bool show_suggestions = lx_keys && bool(suggestions);
 
   /* Create OK first so FocusFirstControl lands there: Enter confirms
      instead of typing the focused soft key (often @em 1).  Do not use
@@ -478,7 +621,8 @@ TouchTextEntry(char *text, size_t width,
   const auto compute_layout = [&](const PixelRect &rc,
                                   TextEntryLayout &o) noexcept {
     if (soft_keys)
-      ComputeLXTextEntryLayout(soft_keys->BottomLayout(rc), o);
+      ComputeLXTextEntryLayout(soft_keys->BottomLayout(rc),
+                               show_suggestions, o);
     else
       ComputeTextEntryLayout(rc, !system_keyboard, with_paste, o);
   };
@@ -492,6 +636,13 @@ TouchTextEntry(char *text, size_t width,
   _editor.SetReadOnly();
   editor = &_editor;
   _editor.SetAlignment(WndProperty::Alignment::AUTO);
+
+  std::optional<SuggestionList> suggestions_widget;
+  if (show_suggestions) {
+    suggestions_widget.emplace(client_area, look, L.suggestions,
+                               std::move(suggestions));
+    suggestion_list = &*suggestions_widget;
+  }
 
   if (!lx_keys) {
     ok_button.Create(client_area, look.button, _("OK"), L.ok,
@@ -545,6 +696,8 @@ TouchTextEntry(char *text, size_t width,
     TextEntryLayout layout;
     compute_layout(client_area.GetClientRect(), layout);
     _editor.Move(layout.editor);
+    if (suggestion_list != nullptr)
+      suggestion_list->Move(layout.suggestions);
     if (kb != nullptr)
       kb->Move(layout.keyboard);
     if (!lx_keys) {
@@ -589,6 +742,7 @@ TouchTextEntry(char *text, size_t width,
   textentry_paste = NULL;
   textentry_client = NULL;
   textentry_num_actions = 0;
+  suggestion_list = nullptr;
 
   if (kb != nullptr) {
     keyboard.Hide();

@@ -664,6 +664,11 @@ KeyboardWidget::MoveByVerticalInGrid(int from, int diy, Button *back,
   const int to = FindIndexVerticalFrom(from, diy);
   if (to >= 0)
     return TrySetFocusToEnabledKey(to);
+  if (diy < 0 && upper_focus_target != nullptr &&
+      upper_focus_target->IsVisible() && upper_focus_target->IsEnabled()) {
+    upper_focus_target->SetFocus();
+    return true;
+  }
   if (diy < 0 && back != nullptr) {
     /* No on-screen key @em up: back is the next step (inverse of
        @c down from that key into the grid, which uses the same

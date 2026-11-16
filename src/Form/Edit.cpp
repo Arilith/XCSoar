@@ -402,7 +402,10 @@ WndProperty::PaintLX(Canvas &canvas) noexcept
     const std::size_t length = pos < value.size()
       ? SequenceLengthUTF8(value.c_str() + pos) : 0;
     const std::string_view text{value};
-    const auto character = text.substr(pos, length);
+    const std::string_view completion{text_completion};
+    const auto character = pos == value.size() && !completion.empty()
+      ? completion.substr(0, SequenceLengthUTF8(completion.data()))
+      : text.substr(pos, length);
     canvas.Select(look.text_font);
     const int left = edit_rc.left + int(LX::Scale(LX::Field::TEXT_PADDING));
     const int right = edit_rc.right - int(LX::Scale(LX::Field::TEXT_PADDING));
@@ -424,6 +427,13 @@ WndProperty::PaintLX(Canvas &canvas) noexcept
       LX::DrawField(canvas, edit_rc, state);
       LX::DrawFieldValue(canvas, edit_rc, state, look.text_font,
                          value.c_str() + start, value_warning);
+    }
+    if (pos == value.size() && !text_completion.empty() && x < right) {
+      canvas.SetBackgroundTransparent();
+      canvas.SetTextColor(LX::Field::DISABLED_TEXT);
+      const int y = edit_rc.top + (int(edit_rc.GetHeight()) -
+                                   int(look.text_font.GetHeight())) / 2;
+      canvas.DrawClippedText({x, y}, unsigned(right - x), text_completion);
     }
     if (x < right) {
       canvas.DrawFilledRectangle({x, edit_rc.top + 2,
