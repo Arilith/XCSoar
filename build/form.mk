@@ -33,6 +33,8 @@ FORM_SOURCES = \
 	$(FORM_SRC_DIR)/DigitEntry.cpp \
 	$(FORM_SRC_DIR)/TabDisplay.cpp \
 	$(FORM_SRC_DIR)/TabMenuDisplay.cpp \
+	$(SRC)/Widget/StackWidget.cpp \
+	$(SRC)/Widget/SectionWidget.cpp \
 	$(FORM_SRC_DIR)/CharacterButton.cpp \
 	$(FORM_SRC_DIR)/GridView.cpp \
 	$(FORM_SRC_DIR)/HLine.cpp
