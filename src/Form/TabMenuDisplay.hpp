@@ -4,18 +4,22 @@
 #pragma once
 
 #include "ui/window/PaintWindow.hpp"
-#include "Renderer/TabRenderer.hpp"
+#include "ui/canvas/Font.hpp"
+#include "ui/canvas/Icon.hpp"
 #include "util/StaticArray.hxx"
 
 struct TabMenuGroup;
 struct DialogLook;
 class PagerWidget;
-class MaskedIcon;
 
+/**
+ * The tile grid of the configuration menu (the LXNAV "Setup" menu).
+ * Each tile opens the first page of its group.
+ */
 class TabMenuDisplay final : public PaintWindow
 {
-  /* excludes "Main Menu" which is a "super menu" */
-  static constexpr unsigned MAX_MAIN_MENU_ITEMS = 9;
+  static constexpr unsigned MAX_TILES = 24;
+  static constexpr unsigned MAX_PAGES = 64;
 
   /**
    * The offset from a page number in the #TabMenuDisplay to a page
@@ -23,265 +27,108 @@ class TabMenuDisplay final : public PaintWindow
    */
   static constexpr unsigned PAGE_OFFSET = 1;
 
-  /**
-   * class that holds the child menu button and info for the menu
-   */
-  struct SubMenuButton {
-    //TODO MainMenuButton *group;
-    unsigned main_menu_index;
+  struct Tile {
     const char *caption;
+    MaskedIcon icon;
 
-    PixelRect rc;
-
-    TabRenderer renderer;
-
-    void Draw(Canvas &canvas, const DialogLook &look,
-              bool focused, bool pressed, bool selected) const noexcept {
-      renderer.Draw(canvas, rc, look, caption, nullptr,
-                    focused, pressed, selected);
-    }
-};
-
-  /**
-   * class that holds the main menu button and info
-   */
-  struct MainMenuButton {
-    const char *caption;
-    const MaskedIcon *icon = nullptr;
-
-    PixelRect rc;
-
-    TabRenderer renderer;
-
-    /* index to Pages array of first page in submenu */
-    unsigned first_page_index;
-
-    /* index to Pages array of last page in submenu */
-    unsigned last_page_index;
-
-    unsigned NumSubMenus() const noexcept {
-      return last_page_index - first_page_index + 1;
-    };
-
-    void Draw(Canvas &canvas, const DialogLook &look,
-              bool focused, bool pressed, bool selected) const noexcept;
+    /** Index of the first/last page of this tile in the pager */
+    unsigned first_page_index, last_page_index;
   };
 
-  /* internally used structure for tracking menu down and selection status */
-  struct MenuTabIndex {
-    static constexpr unsigned NO_MAIN_MENU = 997;
-    static constexpr unsigned NO_SUB_MENU = 998;
+  struct PageCaption {
+    const char *caption;
+    unsigned tile;
+  };
 
-    unsigned main_index;
-    unsigned sub_index;
-
-    constexpr
-    explicit MenuTabIndex(unsigned mainNum,
-                          unsigned subNum=NO_SUB_MENU) noexcept
-      :main_index(mainNum), sub_index(subNum) {}
-
-    constexpr
-    static MenuTabIndex None() noexcept {
-      return MenuTabIndex(NO_MAIN_MENU, NO_SUB_MENU);
-    }
-
-    constexpr
-    bool IsNone() const noexcept {
-      return main_index == NO_MAIN_MENU;
-    }
-
-    constexpr
-    bool IsMain() const noexcept {
-      return main_index != NO_MAIN_MENU && sub_index == NO_SUB_MENU;
-    }
-
-    constexpr
-    bool IsSub() const noexcept {
-      return sub_index != NO_SUB_MENU;
-    }
-
-    constexpr
-    bool operator==(const MenuTabIndex &other) const noexcept {
-      return main_index == other.main_index &&
-        sub_index == other.sub_index;
-    }
-
-    constexpr
-    bool operator!=(const MenuTabIndex &other) const noexcept {
-      return !(*this == other);
-    }
+  /** Geometry of the grid; see UpdateLayout() */
+  struct Metrics {
+    unsigned columns = 1;
+    PixelSize tile_size{1, 1};
+    int pitch_x = 1, pitch_y = 1;
+    int left = 0, top = 0;
+    unsigned content_height = 0;
   };
 
   PagerWidget &pager;
   const DialogLook &look;
 
-  StaticArray<SubMenuButton, 48> buttons;
+  StaticArray<Tile, MAX_TILES> tiles;
+  StaticArray<PageCaption, MAX_PAGES> pages;
 
-  /* holds info and buttons for the main menu.  not on child menus */
-  StaticArray<MainMenuButton, MAX_MAIN_MENU_ITEMS> main_menu_buttons;
+  Metrics metrics;
+  Font label_font, title_font;
+  const char *title = nullptr;
 
-  bool dragging = false; // tracks that mouse is down and captured
-  bool drag_off_button = false; // set by mouse_move
-
-  /* used to track mouse down/up clicks */
-  MenuTabIndex down_index = MenuTabIndex::None();
-
-  /**
-   * Which page is currently selected by the cursor?
-   */
+  /** The focused tile */
   unsigned cursor = 0;
-  unsigned main_columns = 1;
-  unsigned sub_columns = 1;
-  bool selecting_group = true;
 
-  /* used to render which submenu is drawn and which item is highlighted */
+  /** Pixels the grid is scrolled up */
+  unsigned scroll = 0;
+
+  /** The tile under the pointer while the mouse button is down */
+  unsigned down_tile = NO_TILE;
+  static constexpr unsigned NO_TILE = ~0u;
 
 public:
   TabMenuDisplay(PagerWidget &pager, const DialogLook &look) noexcept;
 
   /**
-   * Initializes the menu and buids it from the Menuitem[] array
+   * Build the tiles and add their pages to the pager.
    *
-   * @param pages_in array of TabMenuPage elements to be
-   * displayed in the menu
-   * @param num_pages Size the menus array
+   * @param title caption of the menu
    */
-  void InitMenu(const TabMenuGroup groups[], unsigned n_groups) noexcept;
+  void InitMenu(const TabMenuGroup groups[], unsigned n_groups,
+                const char *title) noexcept;
 
   const char *GetCaption(char buffer[], size_t size) const noexcept;
 
   /**
    * Call this from PagerWidget's OnPageFlipped callback.  It moves
-   * the cursor to the newly selected page.
+   * the cursor to the tile of the newly selected page.
    */
   void OnPageFlipped() noexcept;
 
   void SetCursor(unsigned i) noexcept;
 
-  void SetMainIcon(unsigned index, const MaskedIcon *icon) noexcept {
-    if (index < main_menu_buttons.size())
-      main_menu_buttons[index].icon = icon;
-  }
-
-  bool SelectGroups() noexcept {
-    if (selecting_group)
-      return false;
-    selecting_group = true;
-    if (IsDefined())
-      SetFocus();
-    Invalidate();
-    return true;
-  }
-
-  /** Pager index of a menu page. The menu itself is page 0. */
-  static constexpr unsigned PagerIndex(unsigned menu_index) noexcept {
-    return PAGE_OFFSET + menu_index;
-  }
-
-private:
-  void UpdateLayout() noexcept;
-
-public:
-  /**
-   * Returns index of selected (highlighted) tab
-   * @return
-   */
   unsigned GetCursor() const noexcept {
     return cursor;
   }
 
+  /** Pager index of a page; the menu itself is pager page 0. */
+  static constexpr unsigned PagerIndex(unsigned page_index) noexcept {
+    return PAGE_OFFSET + page_index;
+  }
+
+  /** Pager index of the first page of a tile. */
+  unsigned GetPagerIndex(unsigned tile) const noexcept {
+    return PAGE_OFFSET + tiles[tile].first_page_index;
+  }
+
 private:
-  unsigned GetNumPages() const noexcept {
-    return buttons.size();
-  }
-
-  const char *GetPageParentCaption(unsigned page) const noexcept {
-    assert(page < GetNumPages());
-
-    return main_menu_buttons[buttons[page].main_menu_index].caption;
-  }
-
-  unsigned GetNumMainMenuItems() const noexcept {
-    return main_menu_buttons.size();
-  }
+  void UpdateLayout() noexcept;
+  void LoadFonts() noexcept;
 
   [[gnu::pure]]
-  unsigned GetPageMainIndex(unsigned page) const noexcept {
-    assert(page < GetNumPages());
+  unsigned GetViewHeight() const noexcept;
 
-    return buttons[page].main_menu_index;
-  }
-
-  /**
-   * Looks up the page id from the menu table
-   * based on the main menu and sub menu index parameters
-   *
-   * @MainMenuIndex Index from main menu
-   * @SubMenuIndex Index within submenu
-   * returns page number of selected sub menu item base on menus indexes
-   */
+  /** Rows that fit below the title. */
   [[gnu::pure]]
-  int GetPageNum(MenuTabIndex i) const noexcept;
+  unsigned GetVisibleRows() const noexcept;
 
   [[gnu::pure]]
-  const PixelRect &GetButtonPosition(MenuTabIndex i) const noexcept;
+  PixelRect GetTileRect(unsigned i) const noexcept;
 
-  /**
-   * @param main_menu_index
-   * @return pointer to button or nullptr if index is out of range
-   */
   [[gnu::pure]]
-  const MainMenuButton &GetMainMenuButton(unsigned main_menu_index) const noexcept {
-    assert(main_menu_index < main_menu_buttons.size());
+  unsigned FindTile(PixelPoint p) const noexcept;
 
-    return main_menu_buttons[main_menu_index];
-  }
+  void Open(unsigned tile) noexcept;
+  void MoveCursor(int delta) noexcept;
+  void SetScroll(int value) noexcept;
+  void EnsureVisible(unsigned tile) noexcept;
 
-  /**
-   * Calculates and caches the size and position of ith sub menu button
-   * All menus (landscape or portrait) are drawn vertically
-   * @param i Index of button
-   * @return Rectangle of button coordinates,
-   *   or {0,0,0,0} if index out of bounds
-   */
-  [[gnu::pure]]
-  const PixelRect &GetSubMenuButtonSize(unsigned i) const noexcept {
-    return buttons[i].rc;
-  }
-
-  /**
-   * Calculates and caches the size and position of ith main menu button
-   * All menus (landscape or portrait) are drawn vertically
-   * @param i Index of button
-   * @return Rectangle of button coordinates,
-   *   or {0,0,0,0} if index out of bounds
-   */
-  [[gnu::pure]]
-  const PixelRect &GetMainMenuButtonSize(unsigned i) const noexcept {
-    return main_menu_buttons[i].rc;
-  }
-
-  /**
-   * @param page
-   * @return pointer to button or nullptr if index is out of range
-   */
-  [[gnu::pure]]
-  const SubMenuButton &GetSubMenuButton(unsigned page) const noexcept {
-    assert(page < GetNumPages() && page < buttons.size());
-
-    return buttons[page];
-  }
-
-  /**
-   * @param Pos position of pointer
-   * @param mainIndex main menu whose submenu buttons are visible
-   * @return MenuTabIndex w/ location of item
-   */
-  [[gnu::pure]]
-  MenuTabIndex IsPointOverButton(PixelPoint Pos,
-                                 unsigned mainIndex) const noexcept;
-
-  void DragEnd() noexcept;
+  void DrawTile(Canvas &canvas, unsigned i) const noexcept;
+  void DrawTitle(Canvas &canvas) const noexcept;
+  void DrawScrollBar(Canvas &canvas) const noexcept;
 
 protected:
   void OnResize(PixelSize new_size) noexcept override;
@@ -289,33 +136,13 @@ protected:
   bool OnMouseMove(PixelPoint p, unsigned keys) noexcept override;
   bool OnMouseUp(PixelPoint p) noexcept override;
   bool OnMouseDown(PixelPoint p) noexcept override;
+  bool OnMouseWheel(PixelPoint p, int delta) noexcept override;
   bool OnKeyCheck(unsigned key_code) const noexcept override;
   bool OnKeyDown(unsigned key_code) noexcept override;
+  void OnCancelMode() noexcept override;
 
-  /**
-   * canvas is the tabmenu which is the full content window, no content
-   * @param canvas
-   * Todo: support icons and "ButtonOnly" style
-   */
   void OnPaint(Canvas &canvas) noexcept override;
 
   void OnKillFocus() noexcept override;
   void OnSetFocus() noexcept override;
-
-private:
-  void InvalidateButton(MenuTabIndex i) noexcept {
-    if (SupportsPartialRedraw())
-      Invalidate(GetButtonPosition(i));
-    else
-      Invalidate();
-  }
-
-  /**
-   * draw border around main menu
-   */
-  void PaintMainMenuBorder(Canvas &canvas) const noexcept;
-  void PaintMainMenuItems(Canvas &canvas) const noexcept;
-  void PaintSubMenuBorder(Canvas &canvas,
-                          const MainMenuButton &main_button) const noexcept;
-  void PaintSubMenuItems(Canvas &canvas) const noexcept;
 };

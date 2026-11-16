@@ -107,21 +107,8 @@ static std::unique_ptr<Widget> (*initial_page)() = nullptr;
 // TODO: eliminate global variables
 static ArrowPagerWidget *pager;
 
-static constexpr TabMenuPage files_pages[] = {
-  { N_("Site Files"), CreateSiteConfigPanel },
-  { nullptr, nullptr }
-};
-
-static constexpr TabMenuPage map_pages[] = {
-  { N_("Airspace"), CreateAirspaceConfigPanel },
-  { N_("Elements"), CreateSymbolsConfigPanel },
-#ifdef HAVE_HTTP
-  { NC_("Setting", "NOTAM"), CreateNOTAMConfigPanel },
-#endif
-  { N_("Orientation"), CreateMapDisplayConfigPanel },
-  { N_("Overlays"), CreateMapOverlaysConfigPanel },
-  { N_("Terrain"), CreateTerrainDisplayConfigPanel },
-  { N_("Waypoints"), CreateWaypointDisplayConfigPanel },
+static constexpr TabMenuPage logger_pages[] = {
+  { N_("Logger"), CreateLoggerConfigPanel },
   { nullptr, nullptr }
 };
 
@@ -133,28 +120,32 @@ static constexpr TabMenuPage computer_pages[] = {
   { nullptr, nullptr }
 };
 
-static constexpr TabMenuPage gauge_pages[] = {
-  { N_("Thermal Assistant"), CreateGaugesConfigPanel },
-  { N_("Traffic"), CreateTrafficConfigPanel },
-  { nullptr, nullptr }
-};
-
-static constexpr TabMenuPage task_pages[] = {
-  { N_("Scoring"), CreateScoringConfigPanel },
-  { N_("Task Rules"), CreateTaskRulesConfigPanel },
-  { N_("Turnpoint Types"), CreateTaskDefaultsConfigPanel },
-  { nullptr, nullptr }
-};
-
-static constexpr TabMenuPage look_pages[] = {
-  { N_("InfoBox Sets"), CreateInfoBoxesConfigPanel },
+static constexpr TabMenuPage display_pages[] = {
+  { N_("Screen"), CreateDisplayConfigPanel },
   { N_("Layout"), CreateLayoutConfigPanel },
   { N_("Pages"), CreatePagesConfigPanel },
+  { N_("InfoBox Sets"), CreateInfoBoxesConfigPanel },
   { N_("Vario"), CreateVarioConfigPanel },
   { nullptr, nullptr }
 };
 
-static constexpr TabMenuPage weather_pages[] = {
+static constexpr TabMenuPage files_pages[] = {
+  { N_("Site Files"), CreateSiteConfigPanel },
+  { nullptr, nullptr }
+};
+
+static constexpr TabMenuPage graphics_pages[] = {
+  { N_("Airspace"), CreateAirspaceConfigPanel },
+  { N_("Elements"), CreateSymbolsConfigPanel },
+#ifdef HAVE_HTTP
+  { NC_("Setting", "NOTAM"), CreateNOTAMConfigPanel },
+#endif
+  { N_("Orientation"), CreateMapDisplayConfigPanel },
+  { N_("Overlays"), CreateMapOverlaysConfigPanel },
+  { N_("Terrain"), CreateTerrainDisplayConfigPanel },
+  { N_("Waypoints"), CreateWaypointDisplayConfigPanel },
+  { N_("Thermal Assistant"), CreateGaugesConfigPanel },
+  { N_("Traffic"), CreateTrafficConfigPanel },
 #ifdef HAVE_PCMET
   { "Flugwetter (pc_met)", CreatePCMetConfigPanel },
 #endif
@@ -164,6 +155,46 @@ static constexpr TabMenuPage weather_pages[] = {
   { N_("Thermal Information Map"), CreateWeatherConfigPanel },
   { "XC Therm", CreateXCThermConfigPanel },
 #endif
+  { nullptr, nullptr }
+};
+
+static constexpr TabMenuPage sound_pages[] = {
+#ifdef HAVE_PCM_PLAYER
+  /* Before Units: audio vario deadband uses vertical-speed units. */
+  { N_("Audio"), CreateAudioConfigPanel },
+#endif
+  { nullptr, nullptr }
+};
+
+static constexpr TabMenuPage task_pages[] = {
+  { N_("Task Rules"), CreateTaskRulesConfigPanel },
+  { N_("Turnpoint Types"), CreateTaskDefaultsConfigPanel },
+  { nullptr, nullptr }
+};
+
+static constexpr TabMenuPage optimization_pages[] = {
+  { N_("Scoring"), CreateScoringConfigPanel },
+  { nullptr, nullptr }
+};
+
+static constexpr TabMenuPage units_pages[] = {
+  { N_("Units"), CreateUnitsConfigPanel },
+  { nullptr, nullptr }
+};
+
+// Important: all pages after Units in the pager must not have data fields
+// that are unit-dependent because they will be saved after their units may
+// have changed.  The tiles are therefore ordered so that Units comes after
+// every unit-dependent page.
+static constexpr TabMenuPage hardware_pages[] = {
+  { N_("Network"), CreateNetworkConfigPanel },
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(KOBO)
+  { N_("System Services"), CreateSystemdConfigPanel },
+#ifdef USE_POLL_EVENT
+  { N_("System Tools"), CreateSystemToolsPanel, HasSystemTools },
+#endif
+#endif
+  { NC_("Setting", "Time"), CreateTimeConfigPanel },
   { nullptr, nullptr }
 };
 
@@ -184,39 +215,39 @@ static constexpr TabMenuPage online_pages[] = {
   { nullptr, nullptr }
 };
 
-static constexpr TabMenuPage setup_pages[] = {
-#ifdef HAVE_PCM_PLAYER
-  /* Before Units: audio vario deadband uses vertical-speed units. */
-  { N_("Audio"), CreateAudioConfigPanel },
-#endif
+static constexpr TabMenuPage language_pages[] = {
   { N_("Language, Input"), CreateInterfaceConfigPanel },
-  { N_("Logger"), CreateLoggerConfigPanel },
-  { N_("Units"), CreateUnitsConfigPanel },
-  // Important: all pages after Units in this list must not have data fields that are
-  // unit-dependent because they will be saved after their units may have changed.
-  // ToDo: implement API that controls order in which pages are saved
-  { N_("Network"), CreateNetworkConfigPanel },
-  { N_("Screen"), CreateDisplayConfigPanel },
-#if defined(__linux__) && !defined(__ANDROID__) && !defined(KOBO)
-  { N_("System Services"), CreateSystemdConfigPanel },
-#ifdef USE_POLL_EVENT
-  { N_("System Tools"), CreateSystemToolsPanel, HasSystemTools },
-#endif
-#endif
-  { NC_("Setting", "Time"), CreateTimeConfigPanel },
   { nullptr, nullptr }
 };
 
+static constexpr TabMenuPage no_pages[] = {
+  { nullptr, nullptr }
+};
+
+/**
+ * The tiles of the LXNAV LX9000 "Setup" menu, in the order of the
+ * original.  A tile without pages opens the page of another tile
+ * (the last member) until it has a page of its own.
+ */
 static constexpr TabMenuGroup main_menu_captions[] = {
-  { N_("Site Files"), files_pages },
-  { N_("Map Display"), map_pages },
-  { N_("Glide Computer"), computer_pages },
-  { N_("Gauges"), gauge_pages },
-  { N_("Task"), task_pages },
-  { N_("Look"), look_pages },
-  { N_("Weather"), weather_pages },
-  { NC_("Menu", "Services"), online_pages },
-  { NC_("Menu", "Setup"), setup_pages },
+  { N_("QNH and RES"), no_pages, "lx_qnhres", 3 },
+  { N_("Flight Recorder"), logger_pages, "lx_loger" },
+  { N_("Weight and Balance"), no_pages, "lx_weightbalance", 3 },
+  { N_("Vario Parameters"), computer_pages, "lx_varioset" },
+  { N_("Display"), display_pages, "lx_display" },
+  { N_("Files and Transfer"), files_pages, "lx_transfer" },
+  { N_("Graphics"), graphics_pages, "lx_graphics" },
+  { N_("Sounds"), sound_pages, "lx_sounds", 4 },
+  { N_("Observation Zones"), task_pages, "lx_oz" },
+  { N_("Optimization"), optimization_pages, "lx_optimization" },
+  { N_("Warnings"), no_pages, "lx_warnings", 6 },
+  { N_("Units"), units_pages, "lx_units" },
+  { N_("Hardware"), hardware_pages, "lx_hardware" },
+  { N_("Polar and Glider"), no_pages, "lx_polar", 3 },
+  { N_("Profiles and Pilots"), no_pages, "lx_pilots", 1 },
+  { NC_("Menu", "Services"), online_pages, "lx_cloudservices" },
+  { N_("Language"), language_pages, "lx_lang" },
+  { N_("Password"), no_pages, "lx_pwd", 16 },
 };
 
 static unsigned
@@ -551,18 +582,8 @@ void dlgConfigurationShowModal()
     return std::move(_menu);
   }));
 
-  menu.InitMenu(main_menu_captions, ARRAY_SIZE(main_menu_captions));
-
-  const IconLook &icons = UIGlobals::GetIconLook();
-  menu.SetMainIcon(0, &icons.hBmpTabWrench);
-  menu.SetMainIcon(1, &icons.hBmpTabFlight);
-  menu.SetMainIcon(2, &icons.hBmpTabCalculator);
-  menu.SetMainIcon(3, &icons.hBmpTabSystem);
-  menu.SetMainIcon(4, &icons.hBmpTabTask);
-  menu.SetMainIcon(5, &icons.hBmpTabSettings);
-  menu.SetMainIcon(6, &icons.hBmpTabTimes);
-  menu.SetMainIcon(7, &icons.hBmpTabFlight);
-  menu.SetMainIcon(8, &icons.hBmpTabWrench);
+  menu.InitMenu(main_menu_captions, ARRAY_SIZE(main_menu_captions),
+                C_("Menu", "Setup"));
 
   /* restore last selected menu item */
   menu.SetCursor(current_page);
@@ -589,7 +610,7 @@ void dlgConfigurationShowModal()
       return false;
 
     if (pager->GetCurrentIndex() == 0)
-      return menu.SelectGroups();
+      return false;
 
     OnCloseClicked(dialog);
     return true;

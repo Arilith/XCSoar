@@ -246,3 +246,46 @@ static constexpr Color ICON{0xce, 0xe7, 0x72};
 } // namespace ProfilePage
 
 } // namespace LX
+
+namespace LX {
+
+/** The tiles of the "Setup" menu */
+namespace Tile {
+
+static constexpr Color TOP{0x22, 0x22, 0x22};
+static constexpr Color BOTTOM{0x12, 0x12, 0x12};
+static constexpr Color BORDER{0x44, 0x44, 0x44};
+
+static constexpr Color FOCUS_TOP{0x43, 0x43, 0x43};
+static constexpr Color FOCUS_BOTTOM{0x23, 0x23, 0x23};
+static constexpr Color FOCUS_BORDER = COLOR_WHITE;
+
+static constexpr unsigned WIDTH = 233;
+static constexpr unsigned HEIGHT = 78;
+static constexpr unsigned RADIUS = 2;
+
+/** Distance between tiles, and between the grid and the left edge */
+static constexpr unsigned GAP = 2;
+static constexpr unsigned MARGIN = 1;
+
+/** Top of the first row, below the title and its rule */
+static constexpr unsigned GRID_TOP = 36;
+
+static constexpr unsigned LABEL_FONT = 18;
+
+/** Baseline of the label, from the top of the tile */
+static constexpr unsigned LABEL_BASELINE = 69;
+
+/** The icon sits above the label */
+static constexpr unsigned ICON_CENTER_Y = 28;
+static constexpr unsigned ICON_HEIGHT = 36;
+
+/** The scroll bar thumb right of the tiles */
+static constexpr Color THUMB{0xc1, 0xc1, 0xc1};
+static constexpr unsigned THUMB_WIDTH = 8;
+static constexpr unsigned THUMB_MARGIN = 1;
+static constexpr unsigned GUTTER = 11;
+
+} // namespace Tile
+
+} // namespace LX
