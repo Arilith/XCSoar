@@ -5,6 +5,8 @@
 #include "TabMenuData.hpp"
 #include "Widget/PagerWidget.hpp"
 #include "Widget/VScrollWidget.hpp"
+#include "Widget/StackWidget.hpp"
+#include "Widget/SectionWidget.hpp"
 #include "Screen/Layout.hpp"
 #include "ui/event/KeyCode.hpp"
 #include "ui/canvas/Canvas.hpp"
@@ -61,14 +63,29 @@ IsAvailable(const TabMenuItem &item) noexcept
   if (item.IsAvailable != nullptr && !item.IsAvailable())
     return false;
 
-  if (item.children == nullptr)
+  const TabMenuItem *sub = item.children != nullptr
+    ? item.children : item.stack;
+  if (sub == nullptr)
     return true;
 
-  for (auto c = item.children; c->caption != nullptr; ++c)
+  for (auto c = sub; c->caption != nullptr; ++c)
     if (IsAvailable(*c))
       return true;
 
   return false;
+}
+
+/** One page showing all available items, each in a labelled box. */
+static std::unique_ptr<Widget>
+MakeStack(const TabMenuItem *items, const DialogLook &look) noexcept
+{
+  auto stack = std::make_unique<StackWidget>();
+  for (auto i = items; i->caption != nullptr; ++i)
+    if (IsAvailable(*i))
+      stack->Add(std::make_unique<SectionWidget>(look, gettext(i->caption),
+                                                 i->Load()));
+
+  return stack;
 }
 
 void
@@ -117,12 +134,13 @@ TabMenuDisplay::Build(const TabMenuItem *items, unsigned parent) noexcept
       continue;
 
     const unsigned node = n++;
-    if (i->Load != nullptr) {
+    if (i->Load != nullptr || i->stack != nullptr) {
       nodes[node].page = page_nodes.size();
       page_nodes.append(node);
 
       /* Wrap panel in VScrollWidget for automatic scrolling when needed */
-      pager.Add(std::make_unique<VScrollWidget>(i->Load(), look));
+      pager.Add(std::make_unique<VScrollWidget>(
+        i->Load != nullptr ? i->Load() : MakeStack(i->stack, look), look));
     } else if (i->children != nullptr)
       Build(i->children, node);
   }
@@ -133,7 +151,7 @@ TabMenuDisplay::GetCaption(char buffer[], size_t size) const noexcept
 {
   const unsigned page = pager.GetCurrentIndex();
   if (page < PAGE_OFFSET)
-    return IsSubGrid() ? nodes[current].caption : nullptr;
+    return nodes[current].caption;
 
   const Node &node = nodes[page_nodes[page - PAGE_OFFSET]];
   if (node.parent == 0)
@@ -159,7 +177,6 @@ void
 TabMenuDisplay::LoadFonts() noexcept
 {
   label_font.Load(FontDescription(LX::Scale(LX::Tile::LABEL_FONT)));
-  title_font.Load(FontDescription(LX::Scale(LX::TITLE_FONT)));
 }
 
 unsigned
@@ -188,7 +205,7 @@ TabMenuDisplay::UpdateLayout() noexcept
     gutter = LX::Scale(GUTTER);
     min_width = LX::Scale(WIDTH);
     m.tile_size.height = LX::Scale(HEIGHT);
-    m.top = LX::Scale(GRID_TOP);
+    m.top = margin;
   } else {
     gap = margin = Layout::Scale(2);
     gutter = 0;
@@ -534,26 +551,6 @@ TabMenuDisplay::DrawTile(Canvas &canvas, unsigned i) const noexcept
 }
 
 void
-TabMenuDisplay::DrawTitle(Canvas &canvas) const noexcept
-{
-  /* the tiles scroll underneath the title */
-  const int rule_y = LX::Scale(LX::TITLE_RULE_Y);
-  const int width = GetSize().width;
-  canvas.DrawFilledRectangle({0, 0, width, metrics.top}, LX::BACKGROUND);
-  canvas.DrawFilledRectangle({0, rule_y, width,
-                              rule_y + std::max(1, int(LX::Scale(1)))},
-                             LX::TEXT);
-
-  const char *title = nodes[current].caption;
-  canvas.SetBackgroundTransparent();
-  canvas.SetTextColor(LX::TEXT);
-  canvas.Select(title_font);
-  canvas.DrawText({(width - int(canvas.CalcTextWidth(title))) / 2,
-                   int(LX::Scale(LX::TITLE_BASELINE)) -
-                   int(title_font.GetAscentHeight())}, title);
-}
-
-void
 TabMenuDisplay::DrawScrollBar(Canvas &canvas) const noexcept
 {
   const unsigned rows = GetNumRows();
@@ -585,10 +582,8 @@ TabMenuDisplay::OnPaint(Canvas &canvas) noexcept
       DrawTile(canvas, i);
   }
 
-  if (look.lx) {
-    DrawTitle(canvas);
+  if (look.lx)
     DrawScrollBar(canvas);
-  }
 }
 
 void

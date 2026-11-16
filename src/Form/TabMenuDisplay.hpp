@@ -74,7 +74,7 @@ class TabMenuDisplay final : public PaintWindow
   unsigned current = 0;
 
   Metrics metrics;
-  Font label_font, title_font;
+  Font label_font;
 
   /** Pixels the grid is scrolled up; a multiple of the row pitch */
   unsigned scroll = 0;
@@ -176,7 +176,6 @@ private:
   void EnsureVisible(unsigned tile) noexcept;
 
   void DrawTile(Canvas &canvas, unsigned i) const noexcept;
-  void DrawTitle(Canvas &canvas) const noexcept;
   void DrawScrollBar(Canvas &canvas) const noexcept;
 
 protected:

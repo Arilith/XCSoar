@@ -268,9 +268,6 @@ static constexpr unsigned RADIUS = 2;
 static constexpr unsigned GAP = 2;
 static constexpr unsigned MARGIN = 1;
 
-/** Top of the first row, below the title and its rule */
-static constexpr unsigned GRID_TOP = 36;
-
 static constexpr unsigned LABEL_FONT = 18;
 
 /** Baseline of the label, from the top of the tile */
@@ -287,5 +284,21 @@ static constexpr unsigned THUMB_MARGIN = 1;
 static constexpr unsigned GUTTER = 11;
 
 } // namespace Tile
+
+/** A group box in a form: an outline with the caption on its top edge */
+namespace Section {
+
+static constexpr unsigned RADIUS = 6;
+
+/** Distance between the outline and the form inside */
+static constexpr unsigned PADDING = 4;
+
+/** Empty space below the box */
+static constexpr unsigned GAP = 8;
+
+/** Distance between the left edge and the caption */
+static constexpr unsigned CAPTION_X = 10;
+
+} // namespace Section
 
 } // namespace LX

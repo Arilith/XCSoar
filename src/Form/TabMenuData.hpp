@@ -8,8 +8,8 @@
 class Widget;
 
 /**
- * A tile of the configuration menu.  Exactly one of #Load, #Action
- * and #children says what the tile does.  Tables of items end with an
+ * A tile of the configuration menu.  Exactly one of #Load, #Action,
+ * #stack and #children says what the tile does.  Tables of items end with an
  * item without a caption.
  */
 struct TabMenuItem {
@@ -20,6 +20,12 @@ struct TabMenuItem {
 
   /** Call a function, e.g. to show a dialog. */
   void (*Action)() = nullptr;
+
+  /**
+   * Open one page which stacks the pages of these items, each in a
+   * labelled box.  Their settings are saved in this order.
+   */
+  const TabMenuItem *stack = nullptr;
 
   /**
    * Open a grid of further tiles.  A grid with a single available

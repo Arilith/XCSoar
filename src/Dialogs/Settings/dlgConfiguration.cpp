@@ -147,9 +147,14 @@ static constexpr TabMenuItem vario_items[] = {
   { nullptr }
 };
 
-static constexpr TabMenuItem display_items[] = {
+static constexpr TabMenuItem screen_items[] = {
   { .caption = N_("Screen"), .Load = CreateDisplayConfigPanel },
   { .caption = N_("Layout"), .Load = CreateLayoutConfigPanel },
+  { nullptr }
+};
+
+static constexpr TabMenuItem display_items[] = {
+  { .caption = N_("Screen and Layout"), .stack = screen_items },
   { .caption = N_("Pages"), .Load = CreatePagesConfigPanel },
   { .caption = N_("InfoBox Sets"), .Load = CreateInfoBoxesConfigPanel },
   { nullptr }
@@ -205,9 +210,9 @@ static constexpr TabMenuItem thermal_items[] = {
 
 /* the pages of the original Graphics sub-menu of the LX9000 */
 static constexpr TabMenuItem graphics_items[] = {
-  { .caption = N_("Map and Terrain"), .children = map_items,
+  { .caption = N_("Map and Terrain"), .stack = map_items,
     .icon = "lx_map" },
-  { .caption = N_("Weather"), .children = weather_items,
+  { .caption = N_("Weather"), .stack = weather_items,
     .icon = "lx_weather" },
   { .caption = N_("Airspaces and NOTAMs"), .children = airspace_items,
     .icon = "lx_airspace" },
@@ -216,7 +221,7 @@ static constexpr TabMenuItem graphics_items[] = {
     .icon = "lx_waypoints" },
   { .caption = N_("Glider and Track"), .Load = CreateSymbolsConfigPanel,
     .icon = "lx_glider" },
-  { .caption = N_("Thermal Mode"), .children = thermal_items,
+  { .caption = N_("Thermal Mode"), .stack = thermal_items,
     .icon = "lx_thermal" },
   { .caption = N_("FLARM"), .Load = CreateTrafficConfigPanel,
     .icon = "lx_flarm" },
@@ -229,10 +234,15 @@ static constexpr TabMenuItem task_items[] = {
   { nullptr }
 };
 
-static constexpr TabMenuItem hardware_items[] = {
-  { .caption = N_("Devices"), .Action = ShowDevices },
+static constexpr TabMenuItem network_items[] = {
   { .caption = N_("Network"), .Load = CreateNetworkConfigPanel },
   { .caption = NC_("Setting", "Time"), .Load = CreateTimeConfigPanel },
+  { nullptr }
+};
+
+static constexpr TabMenuItem hardware_items[] = {
+  { .caption = N_("Devices"), .Action = ShowDevices },
+  { .caption = N_("Network and Time"), .stack = network_items },
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(KOBO)
   { .caption = N_("System Services"), .Load = CreateSystemdConfigPanel },
 #ifdef USE_POLL_EVENT
@@ -277,7 +287,7 @@ static constexpr TabMenuItem main_menu_items[] = {
     .icon = "lx_loger" },
   { .caption = N_("Weight and Balance"), .Action = dlgBasicSettingsShowModal,
     .icon = "lx_weightbalance" },
-  { .caption = N_("Vario Parameters"), .children = vario_items,
+  { .caption = N_("Vario Parameters"), .stack = vario_items,
     .icon = "lx_varioset" },
   { .caption = N_("Display"), .children = display_items,
     .icon = "lx_display" },
@@ -290,7 +300,7 @@ static constexpr TabMenuItem main_menu_items[] = {
   { .caption = N_("Sounds"), .Load = CreateAudioConfigPanel,
     .icon = "lx_sounds" },
 #endif
-  { .caption = N_("Observation Zones"), .children = task_items,
+  { .caption = N_("Observation Zones"), .stack = task_items,
     .icon = "lx_oz" },
   { .caption = N_("Optimization"), .Load = CreateScoringConfigPanel,
     .icon = "lx_optimization" },
@@ -304,7 +314,7 @@ static constexpr TabMenuItem main_menu_items[] = {
     .icon = "lx_polar" },
   { .caption = N_("Profiles and Pilots"), .children = pilot_items,
     .icon = "lx_pilots" },
-  { .caption = NC_("Menu", "Services"), .children = service_items,
+  { .caption = NC_("Menu", "Services"), .stack = service_items,
     .icon = "lx_cloudservices" },
   { .caption = N_("Language"), .Load = CreateInterfaceConfigPanel,
     .icon = "lx_lang" },
