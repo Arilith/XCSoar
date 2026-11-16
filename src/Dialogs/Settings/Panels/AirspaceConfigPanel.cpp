@@ -163,8 +163,6 @@ AirspaceConfigPanel::Prepare(ContainerWindow &parent,
 #endif
 
   AddSpacer();
-
-  AddSpacer();
   SetExpertRow(SPACER_APPEARANCE);
 
   AddBoolean(_("Use black outline"),
