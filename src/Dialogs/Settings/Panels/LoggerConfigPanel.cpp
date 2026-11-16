@@ -20,8 +20,6 @@
 using namespace std::chrono;
 
 enum ControlIndex {
-  PilotName,
-  CoPilotName,
   CrewWeightTemplate,
   SPACER_LOG,
   LoggerTimeStepCruise,
@@ -57,14 +55,6 @@ LoggerConfigPanel::Prepare(ContainerWindow &parent,
   const LoggerSettings &logger = settings_computer.logger;
 
   RowFormWidget::Prepare(parent, rc);
-  AddText(_("Pilot name"),
-          _("Name of the pilot in command, recorded in the IGC flight log."),
-          logger.pilot_name);
-
-  AddText(_("CoPilot name"),
-          _("The co-pilot name recorded in the IGC flight log."),
-          logger.copilot_name);
-
   AddFloat(_("Crew weight default"),
             _("Default for all weight loaded to the glider beyond the empty weight and besides "
                 "the water ballast."),
@@ -112,12 +102,6 @@ LoggerConfigPanel::Save(bool &changed) noexcept
 {
   ComputerSettings &settings_computer = CommonInterface::SetComputerSettings();
   LoggerSettings &logger = settings_computer.logger;
-
-  changed |= SaveValue(PilotName, ProfileKeys::PilotName,
-                       logger.pilot_name);
-
-  changed |= SaveValue(CoPilotName, ProfileKeys::CoPilotName,
-                       logger.copilot_name);
 
   changed |= SaveValue(CrewWeightTemplate, UnitGroup::MASS, ProfileKeys::CrewWeightTemplate,
                        logger.crew_mass_template);

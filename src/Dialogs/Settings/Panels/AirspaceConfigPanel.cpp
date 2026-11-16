@@ -25,12 +25,6 @@ enum ControlIndex {
 #ifdef HAVE_HTTP
   ShowNotamLabels,
 #endif
-  SPACER_WARNINGS,
-  AirspaceWarnings,
-  WarningDialog,
-  WarningTime,
-  RepetitiveSound,
-  AcknowledgeTime,
   SPACER_APPEARANCE,
   UseBlackOutline,
   AirspaceFillMode,
@@ -76,7 +70,6 @@ public:
     :RowFormWidget(UIGlobals::GetDialogLook()) {}
 
   void ShowDisplayControls(AirspaceDisplayMode mode);
-  void ShowWarningControls(bool visible);
 
   /* methods from Widget */
   void Prepare(ContainerWindow &parent, const PixelRect &rc) noexcept override;
@@ -98,15 +91,6 @@ AirspaceConfigPanel::ShowDisplayControls(AirspaceDisplayMode mode)
   SetRowAvailable(AltWarningMargin,
                   mode == AirspaceDisplayMode::AUTO ||
                   mode == AirspaceDisplayMode::ALLBELOW);
-}
-
-void
-AirspaceConfigPanel::ShowWarningControls(bool visible)
-{
-  SetRowAvailable(WarningDialog, visible);
-  SetRowAvailable(WarningTime, visible);
-  SetRowAvailable(RepetitiveSound, visible);
-  SetRowAvailable(AcknowledgeTime, visible);
 }
 
 void
@@ -138,9 +122,6 @@ AirspaceConfigPanel::OnModified(DataField &df) noexcept
     const DataFieldEnum &dfe = (const DataFieldEnum &)df;
     AirspaceDisplayMode mode = (AirspaceDisplayMode)dfe.GetValue();
     ShowDisplayControls(mode);
-  } else if (IsDataField(AirspaceWarnings, df)) {
-    const DataFieldBoolean &dfb = (const DataFieldBoolean &)df;
-    ShowWarningControls(dfb.GetValue());
   }
 }
 
@@ -152,8 +133,6 @@ AirspaceConfigPanel::Prepare(ContainerWindow &parent,
     CommonInterface::GetComputerSettings().airspace;
   const AirspaceRendererSettings &renderer =
     CommonInterface::GetMapSettings().airspace;
-  const UISettings &ui_settings =
-    CommonInterface::GetUISettings();
 
   RowFormWidget::Prepare(parent, rc);
 
@@ -185,31 +164,6 @@ AirspaceConfigPanel::Prepare(ContainerWindow &parent,
 
   AddSpacer();
 
-  AddBoolean(_("Warnings"), _("Enable/disable all airspace warnings."),
-             computer.enable_warnings, this);
-
-  AddBoolean(_("Warnings dialog"),
-             _("Enable/disable displaying airspaces warnings dialog."),
-             ui_settings.enable_airspace_warning_dialog, this);
-  SetExpertRow(WarningDialog);
-
-  AddDuration(_("Warning time"),
-              _("This is the time before an airspace incursion is estimated at which the system will warn the pilot."),
-              seconds{10}, seconds{1000}, seconds{5},
-              computer.warnings.warning_time);
-  SetExpertRow(WarningTime);
-
-  AddBoolean(_("Repetitive sound"),
-             _("Enable/disable repetitive warning sound when airspaces warnings dialog is displayed."),
-             computer.warnings.repetitive_sound, this);
-  SetExpertRow(RepetitiveSound);
-
-  AddDuration(_("Acknowledge time"),
-              _("This is the time period in which an acknowledged airspace warning will not be repeated."),
-              seconds{10}, seconds{1000}, seconds{5},
-              computer.warnings.acknowledgement_time);
-  SetExpertRow(AcknowledgeTime);
-
   AddSpacer();
   SetExpertRow(SPACER_APPEARANCE);
 
@@ -224,7 +178,6 @@ AirspaceConfigPanel::Prepare(ContainerWindow &parent,
   SetExpertRow(AirspaceFillMode);
 
   ShowDisplayControls(renderer.altitude_mode);
-  ShowWarningControls(computer.enable_warnings);
 }
 
 
@@ -237,7 +190,6 @@ AirspaceConfigPanel::Save(bool &_changed) noexcept
     CommonInterface::SetComputerSettings().airspace;
   AirspaceRendererSettings &renderer =
     CommonInterface::SetMapSettings().airspace;
-  UISettings &ui_settings = CommonInterface::SetUISettings();
 
   changed |= SaveValueEnum(AirspaceDisplay, ProfileKeys::AltMode, renderer.altitude_mode);
 
@@ -251,20 +203,6 @@ AirspaceConfigPanel::Save(bool &_changed) noexcept
   changed |= SaveValue(ClipAltitude, UnitGroup::ALTITUDE, ProfileKeys::ClipAlt, renderer.clip_altitude);
 
   changed |= SaveValue(AltWarningMargin, UnitGroup::ALTITUDE, ProfileKeys::AltMargin, computer.warnings.altitude_warning_margin);
-
-  changed |= SaveValue(AirspaceWarnings, ProfileKeys::AirspaceWarning, computer.enable_warnings);
-
-  changed |= SaveValue(WarningDialog, ProfileKeys::AirspaceWarningDialog,
-                       ui_settings.enable_airspace_warning_dialog);
-
-  changed |= SaveValue(WarningTime, ProfileKeys::WarningTime,
-                       computer.warnings.warning_time);
-
-  changed |= SaveValue(RepetitiveSound, ProfileKeys::RepetitiveSound,
-                       computer.warnings.repetitive_sound);
-
-  changed |= SaveValue(AcknowledgeTime, ProfileKeys::AcknowledgementTime,
-                       computer.warnings.acknowledgement_time);
 
   changed |= SaveValue(UseBlackOutline, ProfileKeys::AirspaceBlackOutline, renderer.black_outline);
 
