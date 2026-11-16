@@ -20,9 +20,11 @@
 #include "util/StringAPI.hxx"
 #include "util/StringCompare.hxx"
 #include "util/TruncateString.hpp"
+#include "util/UTF8.hpp"
 #include "ui/window/Window.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <optional>
 
 namespace {
@@ -156,11 +158,23 @@ static unsigned int cursor = 0;
 static size_t max_width;
 static char edittext[MAX_TEXTENTRY];
 
+static const char *
+GetAllowedCharacters()
+{
+  if (!AllowedCharactersCallback)
+    return nullptr;
+
+  static char prefix[MAX_TEXTENTRY];
+  std::copy_n(edittext, cursor, prefix);
+  prefix[cursor] = 0;
+  return AllowedCharactersCallback(prefix);
+}
+
 static void
 UpdateAllowedCharacters()
 {
   if (kb != nullptr && AllowedCharactersCallback)
-    kb->SetAllowedCharacters(AllowedCharactersCallback(edittext));
+    kb->SetAllowedCharacters(GetAllowedCharacters());
 }
 
 /**
@@ -176,7 +190,7 @@ FilterCharacter(char ch)
   if (!AllowedCharactersCallback)
     return ch;
 
-  const char *allowed = AllowedCharactersCallback(edittext);
+  const char *allowed = GetAllowedCharacters();
   if (allowed == nullptr || StringFind(allowed, ch) != nullptr)
     return ch;
 
@@ -192,8 +206,23 @@ static void
 UpdateTextboxProp()
 {
   editor->SetText(edittext);
+  if (editor->look.lx)
+    editor->SetTextCursor(cursor);
 
   UpdateAllowedCharacters();
+}
+
+static unsigned
+PreviousCursor() noexcept
+{
+  unsigned previous = 0;
+  while (previous < cursor) {
+    const auto length = SequenceLengthUTF8(edittext + previous);
+    if (length == 0 || previous + length >= cursor)
+      break;
+    previous += length;
+  }
+  return previous;
 }
 
 static bool
@@ -202,8 +231,10 @@ DoBackspace()
   if (cursor < 1)
     return false;
 
-  cursor--;
-  edittext[cursor] = 0;
+  const unsigned previous = PreviousCursor();
+  std::memmove(edittext + previous, edittext + cursor,
+               std::strlen(edittext + cursor) + 1);
+  cursor = previous;
   UpdateTextboxProp();
   return true;
 }
@@ -217,13 +248,36 @@ OnBackspace()
 static bool
 DoCharacter(char character)
 {
-  if (cursor >= max_width - 1)
+  const auto length = std::strlen(edittext);
+  if (length >= max_width - 1)
     return false;
 
+  std::memmove(edittext + cursor + 1, edittext + cursor,
+               length - cursor + 1);
   edittext[cursor++] = character;
-  edittext[cursor] = 0;
   UpdateTextboxProp();
   return true;
+}
+
+static void
+MoveCursorLeft()
+{
+  if (cursor == 0)
+    return;
+  cursor = PreviousCursor();
+  UpdateTextboxProp();
+}
+
+static void
+MoveCursorRight()
+{
+  if (edittext[cursor] == 0)
+    return;
+  const auto length = SequenceLengthUTF8(edittext + cursor);
+  if (length == 0)
+    return;
+  cursor += length;
+  UpdateTextboxProp();
 }
 
 /**
@@ -461,7 +515,9 @@ TouchTextEntry(char *text, size_t width,
 
   KeyboardWidget keyboard(look.button, FormCharacter, !accb,
                           default_shift_state);
-  keyboard.SetActions([](){ ClearText(); }, [](){ OnBackspace(); });
+  keyboard.SetActions([](){ ClearText(); }, [](){ OnBackspace(); },
+                      [](){ MoveCursorLeft(); },
+                      [](){ MoveCursorRight(); });
 
   kb = nullptr;
   if (!system_keyboard) {

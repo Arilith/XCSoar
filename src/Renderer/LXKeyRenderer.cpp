@@ -79,6 +79,22 @@ LXKeyRenderer::DrawBackspace(Canvas &canvas, const PixelRect &face,
 }
 
 void
+LXKeyRenderer::DrawArrow(Canvas &canvas, const PixelRect &face, Color color,
+                         bool left) const noexcept
+{
+  const int x = (face.left + face.right) / 2;
+  const int y = (face.top + face.bottom) / 2;
+  const int half_width = LX::Scale(12);
+  const int half_height = LX::Scale(7);
+  const int direction = left ? -1 : 1;
+  const int tip = x + direction * half_width;
+  canvas.Select(Pen(std::max(1u, LX::Scale(3)), color));
+  canvas.DrawLine({x - direction * half_width, y}, {tip, y});
+  canvas.DrawLine({tip, y}, {tip - direction * half_height, y - half_height});
+  canvas.DrawLine({tip, y}, {tip - direction * half_height, y + half_height});
+}
+
+void
 LXKeyRenderer::DrawButton(Canvas &canvas, const PixelRect &rc,
                           ButtonState state) const noexcept
 {
@@ -94,6 +110,8 @@ LXKeyRenderer::DrawButton(Canvas &canvas, const PixelRect &rc,
       DrawSpace(canvas, face, color);
     else if (glyph == Glyph::BACKSPACE)
       DrawBackspace(canvas, face, color);
+    else if (glyph == Glyph::LEFT || glyph == Glyph::RIGHT)
+      DrawArrow(canvas, face, color, glyph == Glyph::LEFT);
     else
       DrawCaption(canvas, face, color);
     return;
@@ -121,6 +139,8 @@ LXKeyRenderer::DrawButton(Canvas &canvas, const PixelRect &rc,
     DrawSpace(canvas, face, LX::Keyboard::DISABLED_TEXT);
   else if (glyph == Glyph::BACKSPACE)
     DrawBackspace(canvas, face, LX::Keyboard::TEXT);
+  else if (glyph == Glyph::LEFT || glyph == Glyph::RIGHT)
+    DrawArrow(canvas, face, LX::Keyboard::TEXT, glyph == Glyph::LEFT);
   else
     DrawCaption(canvas, face, LX::Keyboard::TEXT);
 }

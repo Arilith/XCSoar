@@ -7,6 +7,7 @@
 #include "ui/dim/Rect.hpp"
 
 #include <string>
+#include <optional>
 
 struct DialogLook;
 class DataField;
@@ -37,6 +38,9 @@ public:
   int caption_width;
 
   std::string value;
+
+  /** Byte offset of the insertion point, when used as a text editor. */
+  std::optional<std::size_t> text_cursor;
 
   DataField *data_field = nullptr;
 
@@ -174,6 +178,11 @@ public:
    * @param Value The new text of the Editor Control
    */
   void SetText(const char *_value) noexcept;
+
+  void SetTextCursor(std::size_t position) noexcept {
+    text_cursor = position;
+    Invalidate();
+  }
 
 private:
   /**

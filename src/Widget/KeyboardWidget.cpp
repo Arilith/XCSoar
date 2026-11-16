@@ -133,6 +133,8 @@ KeyboardWidget::AddActionKeysLX(ContainerWindow &parent) noexcept
   add_action(clear_key, "CLR", LXKeyRenderer::Glyph::TEXT, on_clear);
   add_action(backspace_key, "", LXKeyRenderer::Glyph::BACKSPACE,
              on_backspace);
+  add_action(left_key, "", LXKeyRenderer::Glyph::LEFT, on_left);
+  add_action(right_key, "", LXKeyRenderer::Glyph::RIGHT, on_right);
 }
 
 void
@@ -297,8 +299,7 @@ KeyboardWidget::MoveButtonsLX(const PixelRect &rc) noexcept
       MoveButton(rows[row][column],
                  LX::Keyboard::GetKeyCell(rc, row, column).GetTopLeft());
 
-  /* the last row; the LX has a hide key and cursor keys too, which
-     have no meaning here: the text can only be changed at its end */
+  /* The last row includes the cursor keys used to edit within text. */
   const auto place = [&](Button &key, unsigned column, unsigned span=1){
     key.Move(LX::Keyboard::GetKeyCell(rc, 4, column, span));
   };
@@ -309,6 +310,8 @@ KeyboardWidget::MoveButtonsLX(const PixelRect &rc) noexcept
   if (Button *space = FindButton(' '))
     place(*space, 2, 5);
   place(backspace_key, 7);
+  place(left_key, 8);
+  place(right_key, 9);
 }
 
 void

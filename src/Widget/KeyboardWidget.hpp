@@ -43,15 +43,16 @@ protected:
    * created only in that look.
    */
   SolidContainerWindow panel;
-  Button clear_key, backspace_key;
-  Button::Callback on_clear, on_backspace;
+  Button clear_key, backspace_key, left_key, right_key;
+  Button::Callback on_clear, on_backspace, on_left, on_right;
 
   /**
    * The keys which are not #CharacterButton: shift and, in the LX
-   * look, clear and backspace.  They take part in the cursor key
+   * look, clear, backspace and cursor keys.  They take part in the
+   * cursor key
    * navigation after the characters.
    */
-  Button *extra_keys[3];
+  Button *extra_keys[5];
   unsigned num_extra_keys = 0;
 
   /**
@@ -81,9 +82,13 @@ public:
    * (other looks have them outside).  Call before Prepare().
    */
   void SetActions(Button::Callback _on_clear,
-                  Button::Callback _on_backspace) noexcept {
+                  Button::Callback _on_backspace,
+                  Button::Callback _on_left,
+                  Button::Callback _on_right) noexcept {
     on_clear = std::move(_on_clear);
     on_backspace = std::move(_on_backspace);
+    on_left = std::move(_on_left);
+    on_right = std::move(_on_right);
   }
 
   /**

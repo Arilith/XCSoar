@@ -19,9 +19,11 @@
 #include "Asset.hpp"
 #include "system/Path.hpp"
 #include "system/RunFile.hpp"
+#include "util/UTF8.hpp"
 
 #include <cassert>
 #include <algorithm>
+#include <string_view>
 
 bool
 WndProperty::OnKeyCheck(unsigned key_code) const noexcept
@@ -394,6 +396,46 @@ WndProperty::PaintLX(Canvas &canvas) noexcept
   LX::DrawField(canvas, edit_rc, state);
   LX::DrawFieldValue(canvas, edit_rc, state, look.text_font, value.c_str(),
                      value_warning);
+
+  if (text_cursor && *text_cursor <= value.size()) {
+    const std::size_t pos = *text_cursor;
+    const std::size_t length = pos < value.size()
+      ? SequenceLengthUTF8(value.c_str() + pos) : 0;
+    const std::string_view text{value};
+    const auto character = text.substr(pos, length);
+    canvas.Select(look.text_font);
+    const int left = edit_rc.left + int(LX::Scale(LX::Field::TEXT_PADDING));
+    const int right = edit_rc.right - int(LX::Scale(LX::Field::TEXT_PADDING));
+    const int width = character.empty() ? int(LX::Scale(12))
+      : int(canvas.CalcTextSize(character).width);
+    std::size_t start = 0;
+    int x;
+    while (true) {
+      const auto prefix = text.substr(start, pos - start);
+      x = left + int(canvas.CalcTextSize(prefix).width);
+      if (x + width <= right || start == pos)
+        break;
+      const auto next = SequenceLengthUTF8(value.c_str() + start);
+      if (next == 0)
+        break;
+      start += next;
+    }
+    if (start > 0) {
+      LX::DrawField(canvas, edit_rc, state);
+      LX::DrawFieldValue(canvas, edit_rc, state, look.text_font,
+                         value.c_str() + start, value_warning);
+    }
+    if (x < right) {
+      canvas.DrawFilledRectangle({x, edit_rc.top + 2,
+                                  std::min(right, x + width),
+                                  edit_rc.bottom - 2}, LX::SELECTION);
+      canvas.SetBackgroundTransparent();
+      canvas.SetTextColor(COLOR_WHITE);
+      const int y = edit_rc.top + (int(edit_rc.GetHeight()) -
+                                   int(look.text_font.GetHeight())) / 2;
+      canvas.DrawClippedText({x, y}, unsigned(right - x), character);
+    }
+  }
 
   if (caption_width < 0) {
     const PixelRect area{edit_rc.left, 0, edit_rc.right,

@@ -29,6 +29,8 @@ public:
 
     /** a left arrow with a cross */
     BACKSPACE,
+    LEFT,
+    RIGHT,
   };
 
   /** Characters and actions have different faces. */
@@ -63,4 +65,6 @@ private:
                  Color color) const noexcept;
   void DrawBackspace(Canvas &canvas, const PixelRect &face,
                      Color color) const noexcept;
+  void DrawArrow(Canvas &canvas, const PixelRect &face, Color color,
+                 bool left) const noexcept;
 };
