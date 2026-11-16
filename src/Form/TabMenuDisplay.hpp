@@ -96,7 +96,7 @@ public:
   void InitMenu(const TabMenuItem *items, const char *title) noexcept;
 
   /** The caption of the menu, or of the current page. */
-  const char *GetCaption(char buffer[], size_t size) const noexcept;
+  const char *GetCaption() const noexcept;
 
   /**
    * Call this from PagerWidget's OnPageFlipped callback.  It moves

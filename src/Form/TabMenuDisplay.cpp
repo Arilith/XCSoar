@@ -16,7 +16,6 @@
 #include "Renderer/GradientRenderer.hpp"
 #include "ResourceLookup.hpp"
 #include "Language/Language.hpp"
-#include "util/StringFormat.hpp"
 #include "Asset.hpp"
 
 #include <algorithm>
@@ -147,19 +146,14 @@ TabMenuDisplay::Build(const TabMenuItem *items, unsigned parent) noexcept
 }
 
 const char *
-TabMenuDisplay::GetCaption(char buffer[], size_t size) const noexcept
+TabMenuDisplay::GetCaption() const noexcept
 {
   const unsigned page = pager.GetCurrentIndex();
   if (page < PAGE_OFFSET)
     return nodes[current].caption;
 
   const Node &node = nodes[page_nodes[page - PAGE_OFFSET]];
-  if (node.parent == 0)
-    return node.caption;
-
-  StringFormat(buffer, size, "%s > %s", nodes[node.parent].caption,
-               node.caption);
-  return buffer;
+  return node.caption;
 }
 
 unsigned

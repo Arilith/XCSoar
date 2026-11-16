@@ -578,8 +578,7 @@ OnCloseClicked(WidgetDialog &dialog)
 static void
 UpdateChrome(WidgetDialog &dialog, TabMenuDisplay &menu)
 {
-  char buffer[128];
-  const char *caption = menu.GetCaption(buffer, ARRAY_SIZE(buffer));
+  const char *caption = menu.GetCaption();
   if (caption == nullptr)
     caption = _("Configuration");
   dialog.SetCaption(caption);
@@ -653,6 +652,9 @@ void dlgConfigurationShowModal()
   if (initial_page != nullptr) {
     pager->SetCurrent(menu.FindPage(initial_page), false);
   }
+
+  /* the tiles lead to the pages; the arrows only move between pages */
+  pager->SetCanAdvanceCallback([](unsigned page){ return page != 0; });
 
   pager->SetPageFlippedCallback([&dialog, &menu](){
     OnPageFlipped(dialog, menu);
