@@ -135,7 +135,10 @@ DrawCheckBoxField(Canvas &canvas, const DialogLook &look,
                   const PixelRect &rc, FieldState state,
                   bool checked, const char *caption) noexcept
 {
-  DrawField(canvas, rc, state);
+  /* the row stands directly on the black background; only the
+     focus is marked */
+  if (state == FieldState::FOCUSED)
+    DrawField(canvas, rc, state);
 
   const unsigned size = Scale(CheckBox::BOX_SIZE);
   const int left = rc.left + int(Scale(CheckBox::PADDING));

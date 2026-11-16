@@ -94,8 +94,7 @@ Button::SetCaption(const char *caption)
 {
   assert(caption != nullptr);
 
-  auto &r = (TextButtonRenderer &)*renderer;
-  r.SetCaption(caption);
+  renderer->SetCaption(caption);
 
   Invalidate();
 }

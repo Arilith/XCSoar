@@ -10,6 +10,7 @@
 #include "Asset.hpp"
 #include "Hardware/CPU.hpp"
 #include "Form/Button.hpp"
+#include "Renderer/LXListRenderer.hpp"
 
 #ifdef ENABLE_OPENGL
 #include "ui/canvas/opengl/Scissor.hpp"
@@ -165,17 +166,24 @@ ListControl::DrawItems(Canvas &canvas,
     const bool selected = i == cursor;
     const bool pressed = selected && drag_mode == DragMode::CURSOR;
 
-    canvas.DrawFilledRectangle(rc,
-                               look.list.GetBackgroundColor(selected,
-                                                            focused,
-                                                            pressed));
+    if (look.lx)
+      LX::DrawListRow(canvas, rc,
+                      pressed ? LX::RowState::PRESSED
+                      : !selected ? LX::RowState::NORMAL
+                      : focused ? LX::RowState::FOCUSED
+                      : LX::RowState::SELECTED);
+    else
+      canvas.DrawFilledRectangle(rc,
+                                 look.list.GetBackgroundColor(selected,
+                                                              focused,
+                                                              pressed));
 
     canvas.SetTextColor(look.list.GetTextColor(selected, focused, pressed));
 
     if (item_renderer != nullptr)
       item_renderer->OnPaintItem(canvas, rc, i);
 
-    if (focused && selected)
+    if (focused && selected && !look.lx)
       canvas.DrawFocusRectangle(rc);
 
     rc.Offset(0, rc.GetHeight());

@@ -14,6 +14,7 @@ namespace Layout {
 bool landscape = false;
 bool small_screen = false;
 unsigned min_screen_pixels = 512;
+unsigned ui_scale = 100;
 unsigned scale = 1;
 unsigned scale_1024 = 1024;
 unsigned pen_width_scale = 1024;
@@ -88,9 +89,10 @@ GetDisplaySize([[maybe_unused]] const UI::Display &display,
 
 static void
 Apply(PixelSize new_size, UnsignedPoint2D dpi,
-      unsigned ui_scale, bool has_touch,
+      unsigned _ui_scale, bool has_touch,
       bool is_small_screen) noexcept
 {
+  ui_scale = _ui_scale;
   const unsigned width = new_size.width, height = new_size.height;
 
   min_screen_pixels = std::min(width, height);
@@ -122,7 +124,7 @@ Apply(PixelSize new_size, UnsignedPoint2D dpi,
 
   pt_scale = 1024 * dpi.y / 72;
   vpt_scale = SmallScreenAdjust(pt_scale);
-  font_scale = SmallScreenAdjust(1024 * dpi.y * ui_scale / 72 / 100);
+  font_scale = SmallScreenAdjust(1024 * dpi.y * _ui_scale / 72 / 100);
 
   text_padding = VptScale(2);
 

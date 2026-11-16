@@ -26,6 +26,17 @@ class ScrollBar {
   bool arrow_pressed;
 
   bool PointerOnArrow(PixelPoint p) const noexcept;
+
+  /** The LX look has no arrow buttons: just track and slider. */
+  [[gnu::pure]]
+  bool IsLX() const noexcept;
+
+  /** The height of each arrow button; zero without arrows. */
+  [[gnu::pure]]
+  int GetArrowHeight() const noexcept {
+    return IsLX() ? 0 : GetWidth();
+  }
+
   void StartDrag(PaintWindow *w, int offset) noexcept;
 
   /** Coordinates of the ScrollBar */
@@ -54,7 +65,7 @@ public:
 
   /** Returns the height of the scrollable area of the ScrollBar */
   int GetNettoHeight() const noexcept {
-    return std::max(GetHeight() - 2 * GetWidth() - 1, 0);
+    return std::max(GetHeight() - 2 * GetArrowHeight() - 1, 0);
   }
 
   /**
@@ -111,7 +122,7 @@ public:
    * False otherwise
    */
   bool IsInsideUpArrow(int y) const noexcept {
-    return y < rc.top + GetWidth();
+    return y < rc.top + GetArrowHeight();
   }
 
   /**
@@ -121,7 +132,7 @@ public:
    * False otherwise
    */
   bool IsInsideDownArrow(int y) const noexcept {
-    return y >= rc.bottom - GetWidth();
+    return GetArrowHeight() > 0 && y >= rc.bottom - GetArrowHeight();
   }
 
   /**

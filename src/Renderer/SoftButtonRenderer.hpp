@@ -7,6 +7,8 @@
 #include "Screen/DesignGrid.hpp"
 #include "util/StaticString.hxx"
 
+#include <optional>
+
 class Font;
 
 /**
@@ -16,7 +18,8 @@ class Font;
  *
  * The face is aligned to the bottom and centred in the button
  * rectangle, so the button window can be taller and wider than the
- * face to provide a comfortable touch target.
+ * face to provide a comfortable touch target.  Focus is shown by a
+ * thin white ring around the face.
  */
 class SoftButtonRenderer final : public ButtonRenderer {
 public:
@@ -34,29 +37,50 @@ private:
   const Font *font;
   StaticString<64> caption;
   Badge badge;
-  DesignGrid grid;
+
+  /** If unset, the grid follows the current screen (#LX::Scale). */
+  std::optional<DesignGrid> fixed_grid;
 
 public:
+  /** A soft key scaled like #LX::Scale. */
+  SoftButtonRenderer(const Font &_font, const char *_caption,
+                     Badge _badge) noexcept
+    :font(&_font), caption(_caption), badge(_badge) {}
+
   SoftButtonRenderer(const Font &_font, const char *_caption, Badge _badge,
                      const DesignGrid &_grid) noexcept
-    :font(&_font), caption(_caption), badge(_badge), grid(_grid) {}
+    :font(&_font), caption(_caption), badge(_badge), fixed_grid(_grid) {}
 
   /** Apply a new scale; the font must match it. */
   void SetGrid(const Font &_font, const DesignGrid &_grid) noexcept {
     font = &_font;
-    grid = _grid;
+    fixed_grid = _grid;
+  }
+
+  Badge GetBadge() const noexcept {
+    return badge;
   }
 
   /* virtual methods from class ButtonRenderer */
+  void SetCaption(const char *_caption) noexcept override {
+    caption = _caption;
+  }
+
   unsigned GetMinimumButtonWidth() const noexcept override;
   void DrawButton(Canvas &canvas, const PixelRect &rc,
                   ButtonState state) const noexcept override;
 
 private:
   [[gnu::pure]]
-  PixelRect GetFaceRect(const PixelRect &rc) const noexcept;
+  DesignGrid GetGrid() const noexcept;
 
-  void DrawBadge(Canvas &canvas, const PixelRect &face) const noexcept;
+  [[gnu::pure]]
+  PixelRect GetFaceRect(const PixelRect &rc,
+                        const DesignGrid &grid) const noexcept;
+
+  void DrawBadge(Canvas &canvas, const PixelRect &face,
+                 const DesignGrid &grid) const noexcept;
   void DrawCaption(Canvas &canvas, const PixelRect &face,
-                   ButtonState state) const noexcept;
+                   ButtonState state,
+                   const DesignGrid &grid) const noexcept;
 };

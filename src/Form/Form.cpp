@@ -11,6 +11,7 @@
 #include "util/ScopeExit.hxx"
 #include "Look/DialogLook.hpp"
 #include "Renderer/BoxShadowRenderer.hpp"
+#include "Look/LXLook.hpp"
 #include "ui/event/Globals.hpp"
 
 #include <algorithm>
@@ -97,6 +98,38 @@ WndForm::IsMaximised() const noexcept
   return size.width >= available.width && size.height >= available.height;
 }
 
+unsigned
+WndForm::GetTitleHeight() const noexcept
+{
+  const unsigned font_height = look.caption.font->GetHeight();
+  return look.lx
+    ? std::max(font_height, LX::Scale(LX::TITLE_RULE_Y + 1))
+    : font_height;
+}
+
+void
+WndForm::PaintLXTitle(Canvas &canvas) const noexcept
+{
+  canvas.DrawFilledRectangle(title_rect, lx_title_color);
+
+  const Font &font = *look.caption.font;
+  canvas.Select(font);
+  canvas.SetBackgroundTransparent();
+  canvas.SetTextColor(LX::TEXT);
+
+  const unsigned width = canvas.CalcTextSize(caption.c_str()).width;
+  const int x = title_rect.left +
+    (int(title_rect.GetWidth()) - int(width)) / 2;
+  const int baseline = title_rect.top + LX::Scale(LX::TITLE_BASELINE);
+  canvas.DrawClippedText({std::max(title_rect.left, x),
+                          baseline - int(font.GetAscentHeight())},
+                         title_rect, caption.c_str());
+
+  const int rule_y = title_rect.top + LX::Scale(LX::TITLE_RULE_Y);
+  canvas.DrawFilledRectangle({title_rect.left, rule_y, title_rect.right,
+                              rule_y + 1}, LX::TITLE_RULE);
+}
+
 void
 WndForm::UpdateLayout()
 {
@@ -110,8 +143,7 @@ WndForm::UpdateLayout()
     --title_rect.right;
   }
 
-  title_rect.bottom = rc.top +
-    (caption.empty() ? 0 : look.caption.font->GetHeight());
+  title_rect.bottom = rc.top + (caption.empty() ? 0 : GetTitleHeight());
 
   client_rect = rc.RemainingBelowSafe(title_rect);
 
@@ -421,11 +453,18 @@ WndForm::OnPaint(Canvas &canvas) noexcept
   if (!IsMaximised()) {
     if (IsDithered())
       canvas.DrawOutlineRectangle(rcClient, COLOR_BLACK);
+    else if (look.lx)
+      /* a light line marks the top edge of the dialog */
+      canvas.DrawFilledRectangle({rcClient.left, rcClient.top,
+                                  rcClient.right, rcClient.top + 1},
+                                 LX::Dialog::EDGE);
     else
       canvas.DrawRaisedEdge(rcClient);
   }
 
-  if (!caption.empty()) {
+  if (!caption.empty() && look.lx) {
+    PaintLXTitle(canvas);
+  } else if (!caption.empty()) {
     // Set the colors
     canvas.SetTextColor(COLOR_WHITE);
 

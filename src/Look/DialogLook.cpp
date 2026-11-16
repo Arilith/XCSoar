@@ -4,6 +4,7 @@
 #include "DialogLook.hpp"
 #include "FontDescription.hpp"
 #include "Colors.hpp"
+#include "LXLook.hpp"
 #include "Screen/Layout.hpp"
 #include "Asset.hpp"
 
@@ -14,8 +15,32 @@
 #endif
 
 void
+DialogLook::LoadLXFonts()
+{
+  const auto load = [](Font &font, unsigned design, bool bold=false){
+    font.Load(FontDescription(LX::FontSize(design), bold));
+  };
+
+  load(title_font, LX::TITLE_FONT);
+  load(text_font, LX::DIALOG_FONT);
+  load(small_font, LX::INFO_FONT);
+  load(soft_key_font, LX::SOFT_KEY_FONT);
+
+  /* LX has no bold text; emphasis is the job of colour and size */
+  load(bold_font, LX::DIALOG_FONT);
+  load(small_font_bold, LX::INFO_FONT);
+  load(heading1_font, LX::DIALOG_FONT * 5 / 4);
+  load(heading2_font, LX::DIALOG_FONT * 9 / 8);
+}
+
+void
 DialogLook::LoadFonts()
 {
+  if (lx) {
+    LoadLXFonts();
+    return;
+  }
+
   /* FontScale applies DPI, Text size, and the close-view shrink.
      Cap at the short edge / 20 so menus, forms, headings and status
      text stay on the screen.  Map labels are not capped. */
@@ -51,7 +76,7 @@ DialogLook::Initialise(bool _dark_mode)
 
   LoadFonts();
 
-  caption.font = &text_font;
+  caption.font = lx ? &title_font : &text_font;
 
 #ifdef EYE_CANDY
   caption.background_bitmap.Load(IDB_DIALOGTITLE);
@@ -62,9 +87,14 @@ DialogLook::Initialise(bool _dark_mode)
     caption.background_color = COLOR_DARK_THEME_CAPTION;
     caption.inactive_background_color = COLOR_DARK_THEME_CAPTION_INACTIVE;
 
-    SetBackgroundColor(COLOR_DARK_THEME_BACKGROUND);
-    /* subtle gradient: lighter at top, base color at bottom */
-    background_gradient_top_color = COLOR_DARK_THEME_GRADIENT_TOP;
+    if (lx) {
+      /* solid black, no gradient */
+      SetBackgroundColor(LX::BACKGROUND);
+    } else {
+      SetBackgroundColor(COLOR_DARK_THEME_BACKGROUND);
+      /* subtle gradient: lighter at top, base color at bottom */
+      background_gradient_top_color = COLOR_DARK_THEME_GRADIENT_TOP;
+    }
     text_color = COLOR_WHITE;
 
     focused.background_color = COLOR_XCSOAR;
@@ -79,6 +109,14 @@ DialogLook::Initialise(bool _dark_mode)
     list.focused.text_color = COLOR_WHITE;
     list.pressed.background_color = COLOR_YELLOW;
     list.pressed.text_color = COLOR_BLACK;
+
+    if (lx) {
+      /* the row backgrounds are drawn by #LX::DrawListRow(); the
+         text stays white on all of them */
+      list.background_color = LX::ListRow::PANEL;
+      list.selected.text_color = list.focused.text_color =
+        list.pressed.text_color = LX::TEXT;
+    }
   } else {
     caption.text_color = COLOR_BLACK;
     caption.background_color = IsDithered() ? COLOR_BLACK : COLOR_XCSOAR_DARK;
@@ -109,6 +147,8 @@ DialogLook::Initialise(bool _dark_mode)
   }
 
   button.Initialise(bold_font, dark_mode);
+  button.lx = lx;
+  button.soft_key_font = &soft_key_font;
 
   /* #ButtonState::SELECTED (action bar) matches a focused list row; in dark
      mode use the same bright `focused` (COLOR_XCSOAR) as dialog/tab focus

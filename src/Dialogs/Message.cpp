@@ -7,6 +7,9 @@
 #include "Form/Form.hpp"
 #include "Form/Frame.hpp"
 #include "Look/DialogLook.hpp"
+#include "Look/LXLook.hpp"
+#include "Form/SoftKeyGrid.hpp"
+#include "Renderer/SoftButtonRenderer.hpp"
 #include "Screen/Layout.hpp"
 #include "ui/window/SingleWindow.hpp"
 #include "ui/event/KeyCode.hpp"
@@ -31,6 +34,25 @@ GetMessageBoxStyle() noexcept
 
 static constexpr std::size_t MAX_BUTTONS = 4;
 
+/** The badge of the LX soft key for a button with this result. */
+[[gnu::const]]
+static SoftButtonRenderer::Badge
+GetBadge(int result) noexcept
+{
+  switch (result) {
+  case IDOK:
+  case IDYES:
+    return SoftButtonRenderer::Badge::CHECK;
+
+  case IDCANCEL:
+  case IDNO:
+    return SoftButtonRenderer::Badge::CROSS;
+
+  default:
+    return SoftButtonRenderer::Badge::NONE;
+  }
+}
+
 class MessageBoxForm final : public WndForm {
   WndFrame text_frame;
   boost::container::static_vector<Button, MAX_BUTTONS> buttons;
@@ -39,15 +61,72 @@ class MessageBoxForm final : public WndForm {
 
   void AddButton(const MessageBoxButton &definition, WindowStyle style,
                  int default_result) noexcept {
-    buttons.emplace_back(GetClientAreaWindow(), GetLook().button,
-                         definition.caption, PixelRect{button_size}, style,
-                         MakeModalResultCallback(definition.result));
+    if (GetLook().lx)
+      buttons.emplace_back(GetClientAreaWindow(), PixelRect{button_size},
+                           style,
+                           std::make_unique<SoftButtonRenderer>(
+                             *GetLook().button.soft_key_font,
+                             definition.caption,
+                             GetBadge(definition.result)),
+                           MakeModalResultCallback(definition.result));
+    else
+      buttons.emplace_back(GetClientAreaWindow(), GetLook().button,
+                           definition.caption, PixelRect{button_size}, style,
+                           MakeModalResultCallback(definition.result));
     if (definition.result == default_result)
       default_button = &buttons.back();
   }
 
+  /**
+   * The LX look: a panel across the bottom of the screen with the text
+   * above a row of soft keys.
+   */
+  void UpdateLayoutLX(const PixelRect &parent_rc) noexcept {
+    const unsigned n_buttons = (unsigned)buttons.size();
+    const unsigned width = parent_rc.GetWidth();
+    const unsigned text_margin = LX::Scale(LX::Form::MARGIN) * 2;
+
+    PixelSize client_size(width > 2 ? width - 2 : width, 0u);
+    text_frame.Resize({client_size.width > 2 * text_margin
+                         ? client_size.width - 2 * text_margin
+                         : client_size.width,
+                       Layout::Scale(160u)});
+    const unsigned text_height = text_frame.GetTextHeight() +
+      2 * Layout::GetTextPadding();
+
+    const SoftKeyGrid grid(PixelRect{0, 0, int(client_size.width), 1});
+    const unsigned keys_height =
+      grid.GetHeight(SoftKeyGrid::GetRowCount(n_buttons));
+    client_size.height = text_height + text_margin + keys_height;
+
+    const auto dialog_size = ClientAreaToDialogSize(client_size);
+    Move({PixelPoint{parent_rc.left,
+                     parent_rc.bottom - int(dialog_size.height)},
+          dialog_size});
+
+    text_frame.Move({PixelPoint{int(text_margin), int(text_margin) / 2},
+                     text_frame.GetSize()});
+
+    SoftButtonRenderer::Badge badges[MAX_BUTTONS];
+    unsigned slots[MAX_BUTTONS];
+    for (unsigned i = 0; i < n_buttons; ++i)
+      badges[i] = static_cast<const SoftButtonRenderer &>(
+        buttons[i].GetRenderer()).GetBadge();
+    SoftKeyGrid::AssignSlots({badges, n_buttons}, slots);
+
+    const SoftKeyGrid keys(PixelRect{0, 0, int(client_size.width),
+                                     int(client_size.height)});
+    for (unsigned i = 0; i < n_buttons; ++i)
+      buttons[i].Move(keys.GetSlot(slots[i]));
+  }
+
   void UpdateLayout(const PixelRect &parent_rc) noexcept {
     assert(!buttons.empty());
+
+    if (GetLook().lx) {
+      UpdateLayoutLX(parent_rc);
+      return;
+    }
 
     const unsigned n_buttons = (unsigned)buttons.size();
     unsigned button_width = button_size.width;
@@ -132,6 +211,10 @@ public:
   {
     text_frame.SetText(text);
     text_frame.SetAlignCenter();
+
+    if (look.lx)
+      SetLXPanelColors(LX::Dialog::MESSAGE_TOP, LX::Dialog::MESSAGE_TOP,
+                       LX::Dialog::MESSAGE_BOTTOM);
 
     WindowStyle style;
     style.TabStop();

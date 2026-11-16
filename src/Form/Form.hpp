@@ -5,6 +5,7 @@
 
 #include "ui/window/ContainerWindow.hpp"
 #include "ui/window/SolidContainerWindow.hpp"
+#include "ui/canvas/Color.hpp"
 
 #include <string>
 #include <functional>
@@ -70,6 +71,9 @@ protected:
   /** Coordinates of the titlebar */
   PixelRect title_rect;
 
+  /** The background of the title bar in the LX look. */
+  Color lx_title_color = COLOR_BLACK;
+
   KeyDownFunction key_down_function;
   CharacterFunction character_function;
 
@@ -119,6 +123,12 @@ public:
 protected:
   void UpdateLayout();
 
+  [[gnu::pure]]
+  unsigned GetTitleHeight() const noexcept;
+
+  /** The black title bar with the centred title of the LX look. */
+  void PaintLXTitle(Canvas &canvas) const noexcept;
+
 public:
   /**
    * Returns a reference to the main window.  This is used by dialogs
@@ -166,6 +176,17 @@ public:
 
   ContainerWindow &GetClientAreaWindow() {
     return client_area;
+  }
+
+  /**
+   * Paint the title bar and the client area of the LX look as a
+   * panel: the title on @p title, the client area with a vertical
+   * gradient.
+   */
+  void SetLXPanelColors(Color title, Color top, Color bottom) noexcept {
+    lx_title_color = title;
+    client_area.SetBackgroundColor(bottom);
+    client_area.SetGradientTopColor(top);
   }
 
   /**

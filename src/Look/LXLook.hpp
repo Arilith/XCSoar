@@ -28,6 +28,17 @@ Scale(unsigned design) noexcept
   return (design * Layout::min_screen_pixels + GRID_WIDTH / 2) / GRID_WIDTH;
 }
 
+/**
+ * A font size of the design grid in pixels, additionally scaled by
+ * the text size setting of the user.
+ */
+[[gnu::pure]]
+static inline unsigned
+FontSize(unsigned design) noexcept
+{
+  return Scale(design) * Layout::ui_scale / 100;
+}
+
 static constexpr Color BACKGROUND = COLOR_BLACK;
 static constexpr Color TEXT = COLOR_WHITE;
 static constexpr Color SELECTION{0x31, 0x69, 0xc6};
@@ -42,6 +53,14 @@ static constexpr unsigned SOFT_KEY_FONT = 20;
 /** Title bar: baseline of the title and the rule below it */
 static constexpr unsigned TITLE_BASELINE = 27;
 static constexpr unsigned TITLE_RULE_Y = 33;
+static constexpr Color TITLE_RULE = COLOR_WHITE;
+
+/**
+ * The text of dialogs: field values, list rows and body text.  LX
+ * shows field values at 32 and list rows at 28; the longer strings of
+ * XCSoar need the smaller size to fit into half a screen.
+ */
+static constexpr unsigned DIALOG_FONT = 28;
 
 /** A selection field with a white outline and a grey gradient */
 static constexpr Color FIELD_BORDER = COLOR_WHITE;
@@ -128,6 +147,10 @@ static constexpr Color PRESSED = SELECTION;
 static constexpr Color DISABLED_TEXT{0x80, 0x80, 0x80};
 static constexpr unsigned RADIUS = 2;
 
+/** The white ring marking the key with the keyboard focus */
+static constexpr Color FOCUS_RING = COLOR_WHITE;
+static constexpr unsigned RING_OUTSET = 1;
+
 static constexpr unsigned WIDTH = 100;
 static constexpr unsigned HEIGHT = 26;
 
@@ -159,6 +182,43 @@ static constexpr Palette RED{{0xd8, 0x43, 0x30}, {0x8e, 0x26, 0x1a},
                              {0xe8, 0x8c, 0x80}};
 
 } // namespace Badge
+
+/** Dialogs which do not fill the screen */
+namespace Dialog {
+
+/** The top edge of a dialog */
+static constexpr Color EDGE{0xe8, 0xe8, 0xe8};
+
+/** The vertical gradient of the message box panel */
+static constexpr Color MESSAGE_TOP{0x2c, 0x2c, 0x2c};
+static constexpr Color MESSAGE_BOTTOM{0x13, 0x13, 0x13};
+
+} // namespace Dialog
+
+/** The rows of a list, on a flat panel */
+namespace ListRow {
+
+static constexpr Color PANEL{0x20, 0x20, 0x20};
+
+/** The cursor row */
+static constexpr Color TOP{0x3f, 0x3f, 0x3f};
+static constexpr Color BOTTOM{0x22, 0x22, 0x22};
+static constexpr Color BORDER = COLOR_WHITE;
+static constexpr unsigned RADIUS = 3;
+
+} // namespace ListRow
+
+/** The scroll bar of a list */
+namespace ScrollBar {
+
+static constexpr unsigned WIDTH = 15;
+static constexpr unsigned THUMB_WIDTH = 9;
+static constexpr unsigned RADIUS = 3;
+static constexpr Color BACKGROUND = COLOR_BLACK;
+static constexpr Color OUTLINE = COLOR_WHITE;
+static constexpr Color THUMB = COLOR_WHITE;
+
+} // namespace ScrollBar
 
 /** The "Profile" page */
 namespace ProfilePage {

@@ -46,7 +46,7 @@ public:
     return caption;
   }
 
-  void SetCaption(StaticString<64>::const_pointer _caption) noexcept {
+  void SetCaption(StaticString<64>::const_pointer _caption) noexcept override {
     caption = _caption;
     text_renderer.InvalidateLayout();
   }

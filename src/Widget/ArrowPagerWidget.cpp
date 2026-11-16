@@ -13,6 +13,9 @@
 #include "Form/Form.hpp"
 #include "Renderer/SymbolButtonRenderer.hpp"
 #include "Renderer/TextButtonRenderer.hpp"
+#include "Renderer/SoftButtonRenderer.hpp"
+#include "Form/SoftKeyGrid.hpp"
+#include "Look/ButtonLook.hpp"
 
 #include <algorithm>
 
@@ -23,7 +26,19 @@ ArrowPagerWidget::Layout::Layout(const ButtonLook &look, PixelRect rc,
   const unsigned width = rc.GetWidth(), height = rc.GetHeight();
   const unsigned button_height = ::Layout::GetMaximumControlHeight();
 
-  if (width > height) {
+  if (look.lx) {
+    /* soft keys on the bottom edge, in any orientation: close at the
+       left, then previous and next */
+    const SoftKeyGrid grid(rc);
+    close_button = grid.GetSlot(0, 0);
+    previous_button = grid.GetSlot(0, 1);
+    next_button = grid.GetSlot(0, 2);
+    main.CutBottomSafe(grid.GetRowHeight());
+
+    /* "extra" gets another row above */
+    if (extra_widget != nullptr)
+      extra = main.CutBottomSafe(button_height);
+  } else if (width > height) {
     /* landscape */
 
     /* Size for Close or Back so a caller can swap the caption without
@@ -120,20 +135,42 @@ ArrowPagerWidget::Prepare(ContainerWindow &parent,
   style.Hide();
   style.TabStop();
 
-  previous_button.Create(parent, layout.previous_button, style,
-                         std::make_unique<SymbolButtonRenderer>(look, "<"),
-                         [this](){ Previous(false); });
-  next_button.Create(parent, layout.next_button, style,
-                     std::make_unique<SymbolButtonRenderer>(look, ">"),
-                     [this](){
-                       if (HasNextPage() && CanAdvance())
-                         Next(false);
-                     });
-  close_button.Create(parent, look,
-                      pending_close_caption ? pending_close_caption
-                                            : _("Close"),
-                      layout.close_button,
-                      style, close_callback);
+  const char *const close_caption = pending_close_caption
+    ? pending_close_caption
+    : _("Close");
+
+  if (look.lx) {
+    const auto soft_key = [this](const char *caption, bool close){
+      return std::make_unique<SoftButtonRenderer>(
+        *look.soft_key_font, caption,
+        close ? SoftButtonRenderer::Badge::CROSS
+        : SoftButtonRenderer::Badge::NONE);
+    };
+
+    previous_button.Create(parent, layout.previous_button, style,
+                           soft_key("<", false),
+                           [this](){ Previous(false); });
+    next_button.Create(parent, layout.next_button, style,
+                       soft_key(">", false),
+                       [this](){
+                         if (HasNextPage() && CanAdvance())
+                           Next(false);
+                       });
+    close_button.Create(parent, layout.close_button, style,
+                        soft_key(close_caption, true), close_callback);
+  } else {
+    previous_button.Create(parent, layout.previous_button, style,
+                           std::make_unique<SymbolButtonRenderer>(look, "<"),
+                           [this](){ Previous(false); });
+    next_button.Create(parent, layout.next_button, style,
+                       std::make_unique<SymbolButtonRenderer>(look, ">"),
+                       [this](){
+                         if (HasNextPage() && CanAdvance())
+                           Next(false);
+                       });
+    close_button.Create(parent, look, close_caption, layout.close_button,
+                        style, close_callback);
+  }
   pending_close_caption = nullptr;
 
   WireHorizontalSwipeToPages();

@@ -63,4 +63,9 @@ public:
 
   virtual void DrawButton(Canvas &canvas, const PixelRect &rc,
                           ButtonState state) const noexcept = 0;
+
+  /**
+   * Change the caption; renderers without a text caption ignore it.
+   */
+  virtual void SetCaption([[maybe_unused]] const char *caption) noexcept {}
 };

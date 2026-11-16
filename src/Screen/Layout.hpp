@@ -34,6 +34,11 @@ extern bool small_screen;
 extern unsigned min_screen_pixels;
 
 /**
+ * The text size setting of the user, in percent.
+ */
+extern unsigned ui_scale;
+
+/**
  * Fixed-point scaling factor, fractional part is 10 bits (factor
  * 1024).
  */

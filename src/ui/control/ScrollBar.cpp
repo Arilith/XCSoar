@@ -7,6 +7,8 @@
 #include "ui/window/PaintWindow.hpp"
 #include "Asset.hpp"
 #include "Look/ButtonLook.hpp"
+#include "Look/LXLook.hpp"
+#include "Renderer/LXListRenderer.hpp"
 #include "util/Macros.hpp"
 
 #include <cassert>
@@ -19,13 +21,21 @@ ScrollBar::ScrollBar(const ButtonLook &_button_look) noexcept
   Reset();
 }
 
+bool
+ScrollBar::IsLX() const noexcept
+{
+  return button_renderer.GetLook().lx;
+}
+
 void
 ScrollBar::SetSize(const PixelSize size) noexcept
 {
   unsigned width;
 
+  if (IsLX())
+    width = std::max(1u, LX::Scale(LX::ScrollBar::WIDTH));
   // if the device has a pointer (mouse/touchscreen/etc.)
-  if (HasPointer())
+  else if (HasPointer())
     /* with a mouse, the scroll bar can be smaller */
     width = Layout::GetMinimumControlHeight();
   else
@@ -77,7 +87,7 @@ ScrollBar::SetSlider(unsigned size, unsigned view_size,
 
   // Update slider coordinates
   rc_slider.left = rc.left;
-  rc_slider.top = rc.top + GetWidth() + top;
+  rc_slider.top = rc.top + GetArrowHeight() + top;
   rc_slider.right = rc.right;
   rc_slider.bottom = rc_slider.top + height;
 }
@@ -90,7 +100,7 @@ ScrollBar::ToOrigin(unsigned size, unsigned view_size, int y) const noexcept
   if (max_origin <= 0)
     return 0;
 
-  y -= rc.top + GetWidth();
+  y -= rc.top + GetArrowHeight();
   if (y < 0)
     return 0;
 
@@ -101,6 +111,11 @@ ScrollBar::ToOrigin(unsigned size, unsigned view_size, int y) const noexcept
 void
 ScrollBar::Paint(Canvas &canvas) const noexcept
 {
+  if (IsLX()) {
+    LX::DrawScrollBar(canvas, rc, rc_slider);
+    return;
+  }
+
   const bool up_pressed = arrow_pressed && arrow == Arrow::UP;
   const bool down_pressed = arrow_pressed && arrow == Arrow::DOWN;
   const ButtonState up_state = up_pressed

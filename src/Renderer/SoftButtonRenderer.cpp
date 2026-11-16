@@ -4,6 +4,7 @@
 #include "SoftButtonRenderer.hpp"
 #include "GradientRenderer.hpp"
 #include "Look/LXLook.hpp"
+#include "Screen/Layout.hpp"
 #include "ui/canvas/Canvas.hpp"
 #include "ui/canvas/Font.hpp"
 #include "ui/canvas/Pen.hpp"
@@ -13,14 +14,26 @@
 #include <cmath>
 #include <string>
 
+DesignGrid
+SoftButtonRenderer::GetGrid() const noexcept
+{
+  if (fixed_grid)
+    return *fixed_grid;
+
+  const unsigned width = Layout::min_screen_pixels;
+  return DesignGrid({width, width * LX::GRID_HEIGHT / LX::GRID_WIDTH},
+                    {LX::GRID_WIDTH, LX::GRID_HEIGHT});
+}
+
 unsigned
 SoftButtonRenderer::GetMinimumButtonWidth() const noexcept
 {
-  return grid.Scale(LX::SoftKey::WIDTH);
+  return GetGrid().Scale(LX::SoftKey::WIDTH);
 }
 
 PixelRect
-SoftButtonRenderer::GetFaceRect(const PixelRect &rc) const noexcept
+SoftButtonRenderer::GetFaceRect(const PixelRect &rc,
+                                const DesignGrid &grid) const noexcept
 {
   const int width = grid.Scale(LX::SoftKey::WIDTH);
   const int height = grid.Scale(LX::SoftKey::HEIGHT);
@@ -29,8 +42,8 @@ SoftButtonRenderer::GetFaceRect(const PixelRect &rc) const noexcept
 }
 
 void
-SoftButtonRenderer::DrawBadge(Canvas &canvas,
-                              const PixelRect &face) const noexcept
+SoftButtonRenderer::DrawBadge(Canvas &canvas, const PixelRect &face,
+                              const DesignGrid &grid) const noexcept
 {
   const bool check = badge == Badge::CHECK;
   const LX::Badge::Palette &palette = check ? LX::Badge::GREEN
@@ -69,7 +82,8 @@ SoftButtonRenderer::DrawBadge(Canvas &canvas,
 
 void
 SoftButtonRenderer::DrawCaption(Canvas &canvas, const PixelRect &face,
-                                ButtonState state) const noexcept
+                                ButtonState state,
+                                const DesignGrid &grid) const noexcept
 {
   /* LX shows soft keys in capital letters; converting ASCII only
      cannot break a multi-byte UTF-8 sequence */
@@ -94,7 +108,16 @@ void
 SoftButtonRenderer::DrawButton(Canvas &canvas, const PixelRect &rc,
                                ButtonState state) const noexcept
 {
-  const PixelRect face = GetFaceRect(rc);
+  const DesignGrid grid = GetGrid();
+  const PixelRect face = GetFaceRect(rc, grid);
+
+  if (state == ButtonState::FOCUSED || state == ButtonState::SELECTED) {
+    PixelRect ring = face;
+    ring.Grow(std::max(1, grid.Scale(LX::SoftKey::RING_OUTSET)));
+    DrawGradientBox(canvas, ring, LX::SoftKey::FOCUS_RING,
+                    LX::SoftKey::FOCUS_RING, LX::SoftKey::FOCUS_RING,
+                    grid.Scale(LX::SoftKey::RADIUS));
+  }
 
   const bool pressed = state == ButtonState::PRESSED;
   DrawGradientBox(canvas, face,
@@ -102,8 +125,8 @@ SoftButtonRenderer::DrawButton(Canvas &canvas, const PixelRect &rc,
                   pressed ? LX::SoftKey::PRESSED : LX::SoftKey::BOTTOM,
                   LX::SoftKey::BORDER, grid.Scale(LX::SoftKey::RADIUS));
 
-  DrawCaption(canvas, face, state);
+  DrawCaption(canvas, face, state, grid);
 
   if (badge != Badge::NONE)
-    DrawBadge(canvas, face);
+    DrawBadge(canvas, face, grid);
 }

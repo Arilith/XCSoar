@@ -107,7 +107,8 @@ public:
   }
 
   Button *AddButton(const char *caption, int modal_result) {
-    return AddButton(caption, MakeModalResultCallback(modal_result));
+    return buttons.Add(caption, MakeModalResultCallback(modal_result),
+                       ButtonPanel::BadgeForResult(modal_result));
   }
 
   Button *AddSymbolButton(const char *caption,

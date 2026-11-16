@@ -4,6 +4,9 @@
 #include "Form/ButtonPanel.hpp"
 #include "Renderer/TextButtonRenderer.hpp"
 #include "Renderer/SymbolButtonRenderer.hpp"
+#include "Form/Form.hpp"
+#include "Look/ButtonLook.hpp"
+#include "Form/SoftKeyGrid.hpp"
 #include "ui/window/ContainerWindow.hpp"
 #include "Screen/Layout.hpp"
 #include "ui/event/KeyCode.hpp"
@@ -51,14 +54,39 @@ ButtonPanel::Add(std::unique_ptr<ButtonRenderer> &&renderer,
                             std::move(renderer), std::move(callback));
   button->SetCursorKeyGroup(this);
   keys[buttons.size()] = 0;
+  badges[buttons.size()] = SoftButtonRenderer::Badge::NONE;
   buttons.append(button);
 
   return button;
 }
 
-Button *
-ButtonPanel::Add(const char *caption, Button::Callback callback) noexcept
+SoftButtonRenderer::Badge
+ButtonPanel::BadgeForResult(int modal_result) noexcept
 {
+  switch (modal_result) {
+  case mrOK:
+    return SoftButtonRenderer::Badge::CHECK;
+
+  case mrCancel:
+    return SoftButtonRenderer::Badge::CROSS;
+
+  default:
+    return SoftButtonRenderer::Badge::NONE;
+  }
+}
+
+Button *
+ButtonPanel::Add(const char *caption, Button::Callback callback,
+                 SoftButtonRenderer::Badge badge) noexcept
+{
+  if (look.lx) {
+    auto *button = Add(std::make_unique<SoftButtonRenderer>(
+                         *look.soft_key_font, caption, badge),
+                       std::move(callback));
+    badges[buttons.size() - 1] = badge;
+    return button;
+  }
+
   return Add(std::make_unique<TextButtonRenderer>(look, caption),
              std::move(callback));
 }
@@ -67,6 +95,10 @@ Button *
 ButtonPanel::AddSymbol(const char *caption,
                        Button::Callback callback) noexcept
 {
+  if (look.lx)
+    /* the arrows are plain characters in the soft key font */
+    return Add(caption, std::move(callback));
+
   return Add(std::make_unique<SymbolButtonRenderer>(look, caption),
              std::move(callback));
 }
@@ -165,10 +197,29 @@ ButtonPanel::HorizontalRange(PixelRect rc,
 }
 
 PixelRect
+ButtonPanel::SoftKeyLayout(PixelRect rc) noexcept
+{
+  const unsigned n = buttons.size();
+  const SoftKeyGrid grid(rc);
+
+  unsigned slots[MAX_BUTTONS];
+  SoftKeyGrid::AssignSlots({badges, n}, slots);
+
+  for (unsigned i = 0; i < n; ++i)
+    buttons[i]->Move(grid.GetSlot(slots[i]));
+
+  rc.bottom -= int(grid.GetHeight(SoftKeyGrid::GetRowCount(n)));
+  return rc;
+}
+
+PixelRect
 ButtonPanel::LeftLayout(PixelRect rc) noexcept
 {
   if (buttons.empty())
     return rc;
+
+  if (look.lx)
+    return SoftKeyLayout(rc);
 
   return VerticalRange(rc, 0, buttons.size());
 }
@@ -254,6 +305,9 @@ ButtonPanel::CollectBottomRows(StaticArray<BottomRow, MAX_BUTTONS> &rows,
 unsigned
 ButtonPanel::BottomRowCount(unsigned total_width) const noexcept
 {
+  if (look.lx)
+    return SoftKeyGrid::GetRowCount(buttons.size());
+
   StaticArray<BottomRow, MAX_BUTTONS> rows;
   CollectBottomRows(rows, total_width);
   return rows.size();
@@ -264,6 +318,9 @@ ButtonPanel::BottomLayout(PixelRect rc) noexcept
 {
   if (buttons.empty())
     return rc;
+
+  if (look.lx)
+    return SoftKeyLayout(rc);
 
   StaticArray<BottomRow, MAX_BUTTONS> rows;
   CollectBottomRows(rows, rc.GetWidth());

@@ -5,6 +5,7 @@
 
 #include "util/StaticArray.hxx"
 #include "Form/Button.hpp"
+#include "Renderer/SoftButtonRenderer.hpp"
 
 #include <cassert>
 
@@ -22,6 +23,11 @@ class ButtonPanel {
    * Map key codes to the button that "owns" it.  Used by KeyPress().
    */
   unsigned keys[MAX_BUTTONS];
+
+  /**
+   * The badge of each button; decides its slot in the soft key row.
+   */
+  SoftButtonRenderer::Badge badges[MAX_BUTTONS];
 
   /**
    * The button currently selected with KEY_LEFT / KEY_RIGHT on
@@ -87,7 +93,18 @@ public:
   Button *Add(std::unique_ptr<ButtonRenderer> &&renderer,
               Button::Callback callback) noexcept;
 
-  Button *Add(const char *caption, Button::Callback callback) noexcept;
+  /**
+   * @param badge shown on the soft key in the LX look
+   */
+  Button *Add(const char *caption, Button::Callback callback,
+              SoftButtonRenderer::Badge badge=SoftButtonRenderer::Badge::NONE) noexcept;
+
+  /**
+   * The badge for a button which ends a dialog with this result: a
+   * check for #mrOK, a cross for #mrCancel, nothing for the others.
+   */
+  [[gnu::const]]
+  static SoftButtonRenderer::Badge BadgeForResult(int modal_result) noexcept;
 
   /**
    * Add a symbol button.  The caption is one of the "special"
@@ -177,6 +194,14 @@ private:
 
   PixelRect HorizontalRange(PixelRect rc,
                             unsigned start, unsigned end) noexcept;
+
+  /**
+   * Place the buttons on the soft key grid of the bottom edge: four
+   * slots per row, a confirming button in the last slot and a
+   * cancelling one in the first; further rows go above (see
+   * #SoftKeyGrid).
+   */
+  PixelRect SoftKeyLayout(PixelRect rc) noexcept;
 
   void SetSelectedIndex(unsigned _index) noexcept;
   bool SelectPrevious() noexcept;

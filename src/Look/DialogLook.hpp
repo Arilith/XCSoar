@@ -44,6 +44,12 @@ struct DialogLook {
 
   Font text_font, bold_font, small_font, small_font_bold;
 
+  /** The font of #caption in the LX look. */
+  Font title_font;
+
+  /** The font of the soft keys in the LX look. */
+  Font soft_key_font;
+
   /** Bold font scaled up for H1 headings in rich text */
   Font heading1_font;
 
@@ -109,6 +115,12 @@ struct DialogLook {
   CheckBoxLook check_box;
 
   void LoadFonts();
+
+private:
+  /** Tahoma-proportioned regular fonts of the LX look. */
+  void LoadLXFonts();
+
+public:
 
   void Initialise(bool dark_mode = false);
 

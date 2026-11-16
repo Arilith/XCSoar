@@ -32,6 +32,13 @@ struct ButtonLook {
   /** Dark dialogs use a flat frame instead of a raised bevel. */
   bool flat;
 
+  /**
+   * Show captioned buttons as LX soft keys on the bottom edge (see
+   * #ButtonPanel); needs #soft_key_font.
+   */
+  bool lx = false;
+  const Font *soft_key_font = nullptr;
+
   struct {
     Color color;
     Brush brush;
