@@ -60,6 +60,8 @@ Version 7.47 - not yet released
   - fix a long pause after the quick guide while a fine terrain
     file loads the tiles under the map
 * map
+  - draw the five-InfoBox layout over the map with a translucent
+    backdrop in the LX look on OpenGL displays
   - add an LX-style glider symbol and use it by default in the LX look
   - draw the compass as a black arrow with a white outline in the
     dark LX-style look

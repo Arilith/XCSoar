@@ -6,6 +6,8 @@
 #include "ui/canvas/Color.hpp"
 #include "Screen/Layout.hpp"
 
+#include <cstdint>
+
 /**
  * Colours and metrics of the LXNAV LX9000 user interface.  All
  * lengths are pixels of the 480x788 design grid (see #DesignGrid).
@@ -182,6 +184,11 @@ static constexpr Palette RED{{0xd8, 0x43, 0x30}, {0x8e, 0x26, 0x1a},
                              {0xe8, 0x8c, 0x80}};
 
 } // namespace Badge
+
+/** Backdrop of the translucent map InfoBox strip. */
+namespace NavBox {
+static constexpr uint8_t BACKDROP_ALPHA = 180;
+}
 
 /**
  * The on-screen keyboard: a panel of 10 x 5 cells, each cell holding

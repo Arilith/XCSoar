@@ -19,6 +19,11 @@
 #include "Form/Button.hpp"
 #include "Asset.hpp"
 #include "Hardware/CPU.hpp"
+#include "Look/LXLook.hpp"
+
+#ifdef ENABLE_OPENGL
+#include "ui/canvas/opengl/Scope.hpp"
+#endif
 
 #include <algorithm>
 
@@ -35,15 +40,19 @@ InfoBoxWindow::InfoBoxWindow(ContainerWindow &parent, PixelRect rc,
                              unsigned border_flags,
                              const InfoBoxSettings &_settings,
                              const InfoBoxLook &_look,
-                             unsigned _id,
+                             unsigned _id, bool _overlay,
                              WindowStyle style)
   :settings(_settings), look(_look),
-   border_kind(border_flags),
+   border_kind(border_flags), overlay(_overlay),
    id(_id)
 {
   data.Clear();
 
   Create(parent, rc, style);
+#ifdef ENABLE_OPENGL
+  if (overlay)
+    SetTransparent();
+#endif
 }
 
 void
@@ -59,7 +68,7 @@ InfoBoxWindow::PaintTitle(Canvas &canvas)
   if (data.title.empty())
     return;
 
-  if (settings.border_style == InfoBoxSettings::BorderStyle::SHADED)
+  if (!overlay && settings.border_style == InfoBoxSettings::BorderStyle::SHADED)
     canvas.DrawFilledRectangle(title_rect, look.caption_background_color);
 
   const bool is_selected = HasFocus() || dragging || force_draw_selector;
@@ -79,7 +88,7 @@ InfoBoxWindow::PaintTitle(Canvas &canvas)
 
   canvas.TextAutoClipped({x, y}, data.title);
 
-  if (settings.border_style == InfoBoxSettings::BorderStyle::TAB &&
+  if (!overlay && settings.border_style == InfoBoxSettings::BorderStyle::TAB &&
       halftextwidth > Layout::Scale(3)) {
 
     const auto pad = Layout::Scale(2);
@@ -171,14 +180,20 @@ void
 InfoBoxWindow::Paint(Canvas &canvas)
 {
   const bool is_selected = HasFocus() || dragging || force_draw_selector;
-  const Color background_color = pressed
+  Color background_color = pressed
     ? look.pressed_background_color
     : (is_selected
        ? look.focused_background_color
        : look.background_color);
   
   const PixelRect rc = GetClientRect();
-  if (settings.border_style == InfoBoxSettings::BorderStyle::GLASS)
+  if (overlay && !pressed && !is_selected) {
+#ifdef ENABLE_OPENGL
+    background_color = ColorWithAlpha(COLOR_BLACK, LX::NavBox::BACKDROP_ALPHA);
+    const ScopeAlphaBlend blend;
+    canvas.DrawFilledRectangle(rc, background_color);
+#endif
+  } else if (settings.border_style == InfoBoxSettings::BorderStyle::GLASS)
     DrawGlassBackground(canvas, rc, background_color);
   else
     canvas.DrawFilledRectangle(rc, background_color);
@@ -527,6 +542,17 @@ InfoBoxWindow::OnMouseMove(PixelPoint p, [[maybe_unused]] unsigned keys) noexcep
 
   return false;
 }
+
+#ifdef ENABLE_OPENGL
+void
+InfoBoxWindow::OnPaint(Canvas &canvas) noexcept
+{
+  if (overlay)
+    Paint(canvas);
+  else
+    LazyPaintWindow::OnPaint(canvas);
+}
+#endif
 
 void
 InfoBoxWindow::OnPaintBuffer(Canvas &canvas) noexcept

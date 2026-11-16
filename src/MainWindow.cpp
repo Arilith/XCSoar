@@ -758,8 +758,14 @@ MainWindow::InitialiseConfigured()
                              Fonts::map, Fonts::map_bold,
                              ib_layout.control_size.width);
 
+#ifdef ENABLE_OPENGL
+  ib_layout.overlay = ib_layout.geometry ==
+    InfoBoxSettings::Geometry::BOTTOM_RIGHT_5 &&
+    look->dialog.lx && look->info_box.inverse;
+#endif
+
   InfoBoxManager::Create(*this, ib_layout, look->info_box);
-  map_rect = infobox_area_rc.Contains(rc)
+  map_rect = infobox_area_rc.Contains(rc) && !ib_layout.overlay
     ? ib_layout.remaining
     : rc;
 
@@ -1002,6 +1008,12 @@ MainWindow::ReinitialiseLayout() noexcept
 
   look->ReinitialiseLayout(ib_layout.control_size.width, ui_settings.info_boxes.scale_title_font);
 
+#ifdef ENABLE_OPENGL
+  ib_layout.overlay = ib_layout.geometry ==
+    InfoBoxSettings::Geometry::BOTTOM_RIGHT_5 &&
+    look->dialog.lx && look->info_box.inverse;
+#endif
+
   InfoBoxManager::Create(*this, ib_layout, look->info_box);
   InfoBoxManager::ProcessTimer();
 
@@ -1014,7 +1026,7 @@ MainWindow::ReinitialiseLayout() noexcept
 
      @see GlueMapWindow::UpdateProjection(), which keeps the aircraft
      in the part of the map that is not hidden behind the InfoBoxes */
-  map_rect = infobox_area_rc.Contains(rc)
+  map_rect = infobox_area_rc.Contains(rc) && !ib_layout.overlay
     ? ib_layout.remaining
     : rc;
 

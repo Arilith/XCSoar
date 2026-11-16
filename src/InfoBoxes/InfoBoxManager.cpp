@@ -215,13 +215,14 @@ InfoBoxManager::Create(ContainerWindow &parent,
   for (unsigned i = layout.count; i-- > 0;) {
     const PixelRect &rc = layout.positions[i];
     int Border =
-      settings.border_style == InfoBoxSettings::BorderStyle::TAB
+      layout.overlay || settings.border_style == InfoBoxSettings::BorderStyle::TAB
       ? 0
       /* layout.geometry is the effective layout, while
          settings.geometry is the configured layout */
       : InfoBoxLayout::GetBorder(layout.geometry, layout.landscape, i);
 
-    if (settings.border_style != InfoBoxSettings::BorderStyle::TAB) {
+    if (!layout.overlay &&
+        settings.border_style != InfoBoxSettings::BorderStyle::TAB) {
       /* an InfoBox at the outer edge of the layout has no border
          there, because that edge usually is the screen border; give it
          one when the layout was kept clear of the screen border */
@@ -238,7 +239,7 @@ InfoBoxManager::Create(ContainerWindow &parent,
 
     infoboxes[i] = new InfoBoxWindow(parent, rc,
                                      Border, settings, look,
-                                     i, style);
+                                     i, layout.overlay, style);
   }
 
   infoboxes_hidden = true;

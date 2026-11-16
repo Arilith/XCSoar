@@ -36,6 +36,9 @@ struct Layout {
    */
   unsigned outer_border = 0;
 
+  /** The map is drawn underneath these InfoBoxes. */
+  bool overlay = false;
+
   constexpr bool HasVario() const noexcept {
     return vario.right > vario.left && vario.bottom > vario.top;
   }

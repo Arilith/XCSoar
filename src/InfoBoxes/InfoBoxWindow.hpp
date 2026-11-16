@@ -26,6 +26,8 @@ class InfoBoxWindow : public LazyPaintWindow
 
   const unsigned border_kind;
 
+  const bool overlay;
+
   const unsigned id;
 
   /**
@@ -129,7 +131,7 @@ public:
    */
   InfoBoxWindow(ContainerWindow &parent, PixelRect rc, unsigned border_flags,
                 const InfoBoxSettings &settings, const InfoBoxLook &_look,
-                unsigned id,
+                unsigned id, bool overlay,
                 WindowStyle style=WindowStyle());
 
   const InfoBoxLook &GetLook() const {
@@ -198,5 +200,8 @@ protected:
   bool OnMouseMove(PixelPoint p, unsigned keys) noexcept override;
 
   /* methods from class LazyPaintWindow */
+#ifdef ENABLE_OPENGL
+  void OnPaint(Canvas &canvas) noexcept override;
+#endif
   void OnPaintBuffer(Canvas &canvas) noexcept override;
 };
