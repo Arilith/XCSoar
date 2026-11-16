@@ -7,8 +7,10 @@
 #include "Widget.hpp"
 #include "Form/CharacterButton.hpp"
 #include "Form/Button.hpp"
+#include "ui/window/SolidContainerWindow.hpp"
 
 #include <cstdint>
+#include <utility>
 
 struct ButtonLook;
 class ContainerWindow;
@@ -19,7 +21,7 @@ public:
   typedef bool (*OnCharacterCallback_t)(unsigned ch);
 
 protected:
-  static constexpr unsigned MAX_BUTTONS = 40;
+  static constexpr unsigned MAX_BUTTONS = 48;
 
   const ButtonLook &look;
 
@@ -34,6 +36,23 @@ protected:
   bool shift_state;
 
   const bool show_shift_button;
+
+  /**
+   * The keys of the LX look which are not characters: the panel
+   * behind all keys, and the actions of the last row.  They are
+   * created only in that look.
+   */
+  SolidContainerWindow panel;
+  Button clear_key, backspace_key;
+  Button::Callback on_clear, on_backspace;
+
+  /**
+   * The keys which are not #CharacterButton: shift and, in the LX
+   * look, clear and backspace.  They take part in the cursor key
+   * navigation after the characters.
+   */
+  Button *extra_keys[3];
+  unsigned num_extra_keys = 0;
 
   /**
    * Client area of the text-entry dialog; used for focus lookup when
@@ -56,6 +75,16 @@ public:
     :look(_look), on_character(_on_character), num_buttons(0),
      shift_state(_default_shift_state),
      show_shift_button(_show_shift_button) {}
+
+  /**
+   * The actions of the LX look, which has the keys on the keyboard
+   * (other looks have them outside).  Call before Prepare().
+   */
+  void SetActions(Button::Callback _on_clear,
+                  Button::Callback _on_backspace) noexcept {
+    on_clear = std::move(_on_clear);
+    on_backspace = std::move(_on_backspace);
+  }
 
   /**
    * Show only the buttons representing the specified character list.
@@ -95,6 +124,11 @@ private:
                         int offset_left = 0) noexcept;
   void MoveButtons(const PixelRect &rc);
 
+  /** The cells of the LX look; @p rc is the keyboard panel. */
+  void MoveButtonsLX(const PixelRect &rc) noexcept;
+  void PreparePanelLX(ContainerWindow &parent) noexcept;
+  void AddActionKeysLX(ContainerWindow &parent) noexcept;
+
   [[gnu::pure]]
   static bool IsLandscape(const PixelRect &rc) {
     return rc.GetWidth() >= rc.GetHeight();
@@ -102,6 +136,9 @@ private:
 
   void UpdateShiftState() noexcept;
   void AddButton(ContainerWindow &parent, const char *caption, unsigned ch);
+
+  [[gnu::pure]]
+  const char *GetShiftCaption() const noexcept;
   void OnShiftClicked() noexcept;
 
 public:
@@ -155,7 +192,7 @@ private:
 
   [[gnu::pure]]
   int GetNavigableCount() const noexcept {
-    return (int)num_buttons + (show_shift_button ? 1 : 0);
+    return (int)(num_buttons + num_extra_keys);
   }
 
   const Button *GetByIndex(int idx) const noexcept;

@@ -20,6 +20,15 @@ public:
               OnCharacterCallback on_character, unsigned character,
               const WindowStyle _style=WindowStyle()) noexcept;
 
+  /**
+   * Like above, but with a custom renderer (the keys of the LX
+   * keyboard); #SetCharacter() then updates its caption.
+   */
+  void Create(ContainerWindow &parent, std::unique_ptr<ButtonRenderer> renderer,
+              PixelRect rc, OnCharacterCallback on_character,
+              unsigned character,
+              const WindowStyle _style=WindowStyle()) noexcept;
+
   unsigned GetCharacter() const noexcept {
     return character;
   }

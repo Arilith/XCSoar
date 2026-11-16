@@ -50,6 +50,9 @@ struct DialogLook {
   /** The font of the soft keys in the LX look. */
   Font soft_key_font;
 
+  /** The font of the on-screen keyboard keys in the LX look. */
+  Font key_font, key_label_font;
+
   /** Bold font scaled up for H1 headings in rich text */
   Font heading1_font;
 

@@ -6,6 +6,9 @@
 #include "Form/Form.hpp"
 #include "Form/Button.hpp"
 #include "Form/Edit.hpp"
+#include "Form/ButtonPanel.hpp"
+#include "Look/LXLook.hpp"
+#include "Widget/LXKeyboardLayout.hpp"
 #include "Widget/KeyboardWidget.hpp"
 #include "Asset.hpp"
 #include "Screen/Layout.hpp"
@@ -20,6 +23,7 @@
 #include "ui/window/Window.hpp"
 
 #include <algorithm>
+#include <optional>
 
 namespace {
 struct TextEntryLayout {
@@ -114,22 +118,21 @@ BackspaceCaption(const ButtonLook &look) noexcept
     : "<-";
 }
 
+/**
+ * The LX look: the text on top, the keyboard panel just above the soft
+ * keys; the keys themselves are the soft keys, laid out by the
+ * #ButtonPanel.
+ *
+ * @param rc the client area above the soft keys
+ */
 static void
-ApplyTextEntryLayout(const TextEntryLayout &L, WndProperty &editor, Button &ok,
-                     Button &cancel, Button &clear, KeyboardWidget *keyboard,
-                     Button &backspace, Button *paste,
-                     ContainerWindow &client_area) noexcept
+ComputeLXTextEntryLayout(const PixelRect &rc, TextEntryLayout &o) noexcept
 {
-  editor.Move(L.editor);
-  ok.Move(L.ok);
-  cancel.Move(L.cancel);
-  clear.Move(L.clear);
-  if (keyboard != nullptr)
-    keyboard->Move(L.keyboard);
-  backspace.Move(L.backspace);
-  if (paste != nullptr)
-    paste->Move(L.paste);
-  client_area.Invalidate();
+  o.keyboard = LX::Keyboard::GetPanelRect(rc);
+
+  const int top = rc.top + int(LX::Scale(LX::Keyboard::EDITOR_TOP));
+  o.editor = {o.keyboard.left, top, o.keyboard.right,
+              top + int(LX::Scale(LX::Keyboard::EDITOR_HEIGHT))};
 }
 } // namespace
 
@@ -141,6 +144,10 @@ static Button *textentry_ok = NULL;
 static Button *textentry_cancel = NULL;
 static Button *textentry_clear = NULL;
 static Button *textentry_paste = NULL;
+
+/** The action buttons from left to right; Left/Right move along them. */
+static Button *textentry_actions[3];
+static unsigned textentry_num_actions = 0;
 
 static AllowedCharacters AllowedCharactersCallback;
 
@@ -279,27 +286,19 @@ FormKeyDown(unsigned key_code)
     }
   }
 
-  if (HasCursorKeys() && textentry_client != nullptr && textentry_ok != nullptr &&
-      textentry_cancel != nullptr && textentry_clear != nullptr) {
-    Window *const w = textentry_client->GetFocusedWindow();
-    if (key_code == KEY_RIGHT) {
-      if (w == static_cast<Window *>(textentry_ok)) {
-        textentry_cancel->SetFocus();
+  if (HasCursorKeys() && textentry_client != nullptr &&
+      (key_code == KEY_LEFT || key_code == KEY_RIGHT)) {
+    const Window *const w = textentry_client->GetFocusedWindow();
+    for (unsigned i = 0; i < textentry_num_actions; ++i) {
+      if (w != textentry_actions[i])
+        continue;
+
+      const unsigned next = key_code == KEY_RIGHT ? i + 1 : i - 1;
+      if (next < textentry_num_actions) {
+        textentry_actions[next]->SetFocus();
         return true;
       }
-      if (w == static_cast<Window *>(textentry_cancel)) {
-        textentry_clear->SetFocus();
-        return true;
-      }
-    } else if (key_code == KEY_LEFT) {
-      if (w == static_cast<Window *>(textentry_clear)) {
-        textentry_cancel->SetFocus();
-        return true;
-      }
-      if (w == static_cast<Window *>(textentry_cancel)) {
-        textentry_ok->SetFocus();
-        return true;
-      }
+      break;
     }
   }
 
@@ -391,9 +390,47 @@ TouchTextEntry(char *text, size_t width,
 
   ContainerWindow &client_area = form.GetClientAreaWindow();
   textentry_client = &client_area;
-  const PixelRect rc0 = client_area.GetClientRect();
+
+  WindowStyle button_style;
+  button_style.TabStop();
+
+  /* the LX look has the actions as soft keys and the clear and
+     backspace keys on the keyboard */
+  const bool lx_keys = look.lx && !system_keyboard;
+
+  /* Create OK first so FocusFirstControl lands there: Enter confirms
+     instead of typing the focused soft key (often @em 1).  Do not use
+     HasKeyboard() for this — joystick remotes often appear as HID
+     keyboards.  Up from OK still enters the grid (Space). */
+  std::optional<ButtonPanel> soft_keys;
+  Button ok_button, cancel_button, clear_button, backspace_button,
+    paste_button;
+  if (lx_keys) {
+    soft_keys.emplace(client_area, look.button);
+    textentry_ok = soft_keys->Add(
+      _("OK"), form.MakeModalResultCallback(mrOK),
+      ButtonPanel::BadgeForResult(mrOK));
+    textentry_cancel = soft_keys->Add(
+      _("Cancel"), form.MakeModalResultCallback(mrCancel),
+      ButtonPanel::BadgeForResult(mrCancel));
+    if (with_paste)
+      textentry_paste = soft_keys->Add(_("Paste"), [](){ OnPaste(); });
+
+    textentry_actions[0] = textentry_cancel;
+    textentry_actions[1] = textentry_ok;
+    textentry_num_actions = 2;
+  }
+
+  const auto compute_layout = [&](const PixelRect &rc,
+                                  TextEntryLayout &o) noexcept {
+    if (soft_keys)
+      ComputeLXTextEntryLayout(soft_keys->BottomLayout(rc), o);
+    else
+      ComputeTextEntryLayout(rc, !system_keyboard, with_paste, o);
+  };
+
   TextEntryLayout L;
-  ComputeTextEntryLayout(rc0, !system_keyboard, with_paste, L);
+  compute_layout(client_area.GetClientRect(), L);
 
   WndProperty _editor(client_area, look, "",
                       L.editor,
@@ -402,31 +439,29 @@ TouchTextEntry(char *text, size_t width,
   editor = &_editor;
   _editor.SetAlignment(WndProperty::Alignment::AUTO);
 
-  WindowStyle button_style;
-  button_style.TabStop();
+  if (!lx_keys) {
+    ok_button.Create(client_area, look.button, _("OK"), L.ok,
+                     button_style, form.MakeModalResultCallback(mrOK));
+    textentry_ok = &ok_button;
 
-  /* Create OK first so FocusFirstControl lands there: Enter confirms
-     instead of typing the focused soft key (often @em 1).  Do not use
-     HasKeyboard() for this — joystick remotes often appear as HID
-     keyboards.  Up from OK still enters the grid (Space). */
-  Button ok_button(client_area, look.button, _("OK"),
-                   L.ok,
-                   button_style, form.MakeModalResultCallback(mrOK));
-  textentry_ok = &ok_button;
+    cancel_button.Create(client_area, look.button, _("Cancel"), L.cancel,
+                         button_style,
+                         form.MakeModalResultCallback(mrCancel));
+    textentry_cancel = &cancel_button;
 
-  Button cancel_button(client_area, look.button, _("Cancel"),
-                       L.cancel,
-                       button_style, form.MakeModalResultCallback(mrCancel));
-  textentry_cancel = &cancel_button;
+    clear_button.Create(client_area, look.button, _("Clear"), L.clear,
+                        button_style, [](){ ClearText(); });
+    textentry_clear = &clear_button;
 
-  Button clear_button(client_area, look.button, _("Clear"),
-                      L.clear,
-                      button_style,
-                      [](){ ClearText(); });
-  textentry_clear = &clear_button;
+    textentry_actions[0] = textentry_ok;
+    textentry_actions[1] = textentry_cancel;
+    textentry_actions[2] = textentry_clear;
+    textentry_num_actions = 3;
+  }
 
   KeyboardWidget keyboard(look.button, FormCharacter, !accb,
                           default_shift_state);
+  keyboard.SetActions([](){ ClearText(); }, [](){ OnBackspace(); });
 
   kb = nullptr;
   if (!system_keyboard) {
@@ -437,27 +472,34 @@ TouchTextEntry(char *text, size_t width,
     kb = &keyboard;
   }
 
-  Button backspace_button(client_area, look.button,
-                          BackspaceCaption(look.button),
-                          L.backspace,
-                          button_style, [](){ OnBackspace(); });
+  if (!lx_keys) {
+    backspace_button.Create(client_area, look.button,
+                            BackspaceCaption(look.button), L.backspace,
+                            button_style, [](){ OnBackspace(); });
+    textentry_backspace = &backspace_button;
 
-  textentry_backspace = &backspace_button;
-
-  Button paste_button;
-  if (with_paste) {
-    paste_button.Create(client_area, look.button, _("Paste"), L.paste,
-                        button_style, [](){ OnPaste(); });
-    textentry_paste = &paste_button;
+    if (with_paste) {
+      paste_button.Create(client_area, look.button, _("Paste"), L.paste,
+                          button_style, [](){ OnPaste(); });
+      textentry_paste = &paste_button;
+    }
   }
 
   form.SetClientLayoutFunction([&]() {
-    const PixelRect rc = client_area.GetClientRect();
     TextEntryLayout layout;
-    ComputeTextEntryLayout(rc, !system_keyboard, with_paste, layout);
-    ApplyTextEntryLayout(layout, _editor, ok_button, cancel_button, clear_button,
-                         kb, backspace_button,
-                         with_paste ? &paste_button : nullptr, client_area);
+    compute_layout(client_area.GetClientRect(), layout);
+    _editor.Move(layout.editor);
+    if (kb != nullptr)
+      kb->Move(layout.keyboard);
+    if (!lx_keys) {
+      ok_button.Move(layout.ok);
+      cancel_button.Move(layout.cancel);
+      clear_button.Move(layout.clear);
+      backspace_button.Move(layout.backspace);
+      if (with_paste)
+        paste_button.Move(layout.paste);
+    }
+    client_area.Invalidate();
     if (system_keyboard)
       UI::TextInput::SetScreenKeyboardRect(layout.editor);
   });
@@ -490,6 +532,7 @@ TouchTextEntry(char *text, size_t width,
   textentry_clear = NULL;
   textentry_paste = NULL;
   textentry_client = NULL;
+  textentry_num_actions = 0;
 
   if (kb != nullptr) {
     keyboard.Hide();

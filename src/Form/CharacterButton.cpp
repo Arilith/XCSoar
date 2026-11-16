@@ -2,6 +2,7 @@
 // Copyright The XCSoar Project
 
 #include "Form/CharacterButton.hpp"
+#include "Renderer/ButtonRenderer.hpp"
 #include "util/CharUtil.hxx"
 #include "util/UTF8.hpp"
 
@@ -19,6 +20,22 @@ CharacterButton::Create(ContainerWindow &parent, const ButtonLook &look,
   character = _character;
 
   Button::Create(parent, look, text, rc, style);
+}
+
+void
+CharacterButton::Create(ContainerWindow &parent,
+                        std::unique_ptr<ButtonRenderer> renderer,
+                        PixelRect rc,
+                        OnCharacterCallback _on_character,
+                        unsigned _character,
+                        const WindowStyle style) noexcept
+{
+  assert(_on_character);
+
+  on_character = _on_character;
+  character = _character;
+
+  Button::Create(parent, rc, style, std::move(renderer));
 }
 
 unsigned

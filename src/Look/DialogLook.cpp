@@ -25,6 +25,8 @@ DialogLook::LoadLXFonts()
   load(text_font, LX::DIALOG_FONT);
   load(small_font, LX::INFO_FONT);
   load(soft_key_font, LX::SOFT_KEY_FONT);
+  load(key_font, LX::Keyboard::FONT);
+  load(key_label_font, LX::Keyboard::LABEL_FONT);
 
   /* LX has no bold text; emphasis is the job of colour and size */
   load(bold_font, LX::DIALOG_FONT);
@@ -149,6 +151,8 @@ DialogLook::Initialise(bool _dark_mode)
   button.Initialise(bold_font, dark_mode);
   button.lx = lx;
   button.soft_key_font = &soft_key_font;
+  button.key_font = &key_font;
+  button.key_label_font = &key_label_font;
 
   /* #ButtonState::SELECTED (action bar) matches a focused list row; in dark
      mode use the same bright `focused` (COLOR_XCSOAR) as dialog/tab focus

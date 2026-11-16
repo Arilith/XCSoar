@@ -3,6 +3,10 @@
 
 #include "KeyboardWidget.hpp"
 #include "Renderer/SymbolButtonRenderer.hpp"
+#include "Renderer/LXKeyRenderer.hpp"
+#include "Look/ButtonLook.hpp"
+#include "Look/LXLook.hpp"
+#include "LXKeyboardLayout.hpp"
 #include "Asset.hpp"
 #include "util/StringAPI.hxx"
 #include "util/StringCompare.hxx"
@@ -49,6 +53,7 @@ KeyboardWidget::Unprepare() noexcept
 {
   parent_container = nullptr;
   number_row_before_backspace = -1;
+  num_extra_keys = 0;
 }
 
 void
@@ -57,6 +62,10 @@ KeyboardWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noexcept
   parent_container = &parent;
 
   PrepareSize(rc);
+
+  /* the panel must exist first: it is behind all keys */
+  if (look.lx)
+    PreparePanelLX(parent);
 
   char caption[] = " ";
 
@@ -70,15 +79,60 @@ KeyboardWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noexcept
   AddButton(parent, "@", '@');
   AddButton(parent, "-", '-');
 
+  /* the LX layout has both, instead of one key which shift toggles */
+  if (look.lx) {
+    AddButton(parent, "_", '_');
+    AddActionKeysLX(parent);
+  }
+
   if (show_shift_button) {
     WindowStyle style;
     style.Hide();
     style.TabStop();
+    std::unique_ptr<ButtonRenderer> renderer;
+    if (look.lx)
+      renderer = std::make_unique<LXKeyRenderer>(
+        *look.key_label_font, GetShiftCaption(), LXKeyRenderer::Kind::ACTION);
+    else
+      renderer = std::make_unique<SymbolButtonRenderer>(look, "v");
     shift_button.Create(parent, { 0, 0, 16, 16 }, style,
-                        std::make_unique<SymbolButtonRenderer>(look, "v"),
+                        std::move(renderer),
                         [this](){ OnShiftClicked(); });
+    extra_keys[num_extra_keys++] = &shift_button;
   }
   UpdateShiftState();
+}
+
+void
+KeyboardWidget::PreparePanelLX(ContainerWindow &parent) noexcept
+{
+  WindowStyle style;
+  style.Hide();
+  panel.Create(parent, PixelRect{button_size}, LX::Keyboard::PANEL, style);
+}
+
+void
+KeyboardWidget::AddActionKeysLX(ContainerWindow &parent) noexcept
+{
+  WindowStyle style;
+  style.Hide();
+  style.TabStop();
+  const auto add_action = [&](Button &key, const char *caption,
+                              LXKeyRenderer::Glyph glyph,
+                              Button::Callback &callback){
+    key.Create(parent, PixelRect{button_size}, style,
+               std::make_unique<LXKeyRenderer>(*look.key_label_font, caption,
+                                               LXKeyRenderer::Kind::ACTION,
+                                               glyph),
+               callback);
+    extra_keys[num_extra_keys++] = &key;
+  };
+
+  /* "CLR" is the abbreviation of the LX; it fits the key, unlike the
+     translated word */
+  add_action(clear_key, "CLR", LXKeyRenderer::Glyph::TEXT, on_clear);
+  add_action(backspace_key, "", LXKeyRenderer::Glyph::BACKSPACE,
+             on_backspace);
 }
 
 void
@@ -86,11 +140,17 @@ KeyboardWidget::Show(const PixelRect &rc) noexcept
 {
   OnResize(rc);
 
+  if (look.lx) {
+    /* the keys sit on the panel, whatever the order of creation */
+    panel.BringToBottom();
+    panel.Show();
+  }
+
   for (unsigned i = 0; i < num_buttons; ++i)
     buttons[i].Show();
 
-  if (show_shift_button)
-    shift_button.Show();
+  for (unsigned i = 0; i < num_extra_keys; ++i)
+    extra_keys[i]->Show();
 }
 
 void
@@ -99,8 +159,11 @@ KeyboardWidget::Hide() noexcept
   for (unsigned i = 0; i < num_buttons; ++i)
     buttons[i].Hide();
 
-  if (show_shift_button)
-    shift_button.Hide();
+  for (unsigned i = 0; i < num_extra_keys; ++i)
+    extra_keys[i]->Hide();
+
+  if (look.lx)
+    panel.Hide();
 }
 
 void
@@ -221,9 +284,43 @@ KeyboardWidget::PrepareSize(const PixelRect &rc) noexcept
 }
 
 void
+KeyboardWidget::MoveButtonsLX(const PixelRect &rc) noexcept
+{
+  panel.Move(rc);
+
+  static constexpr const char *rows[] = {
+    "1234567890", "QWERTYUIOP", "ASDFGHJKL@", "ZXCVBNM.-_",
+  };
+
+  for (unsigned row = 0; row < std::size(rows); ++row)
+    for (unsigned column = 0; rows[row][column] != '\0'; ++column)
+      MoveButton(rows[row][column],
+                 LX::Keyboard::GetKeyCell(rc, row, column).GetTopLeft());
+
+  /* the last row; the LX has a hide key and cursor keys too, which
+     have no meaning here: the text can only be changed at its end */
+  const auto place = [&](Button &key, unsigned column, unsigned span=1){
+    key.Move(LX::Keyboard::GetKeyCell(rc, 4, column, span));
+  };
+
+  if (show_shift_button)
+    place(shift_button, 0);
+  place(clear_key, 1);
+  if (Button *space = FindButton(' '))
+    place(*space, 2, 5);
+  place(backspace_key, 7);
+}
+
+void
 KeyboardWidget::OnResize(const PixelRect &rc)
 {
   PrepareSize(rc);
+
+  if (look.lx) {
+    MoveButtonsLX(rc);
+    return;
+  }
+
   ResizeButtons();
   MoveButtons(rc);
 }
@@ -239,15 +336,32 @@ KeyboardWidget::AddButton(ContainerWindow &parent, const char *caption,
   style.TabStop();
 
   CharacterButton &b = buttons[num_buttons++];
-  b.Create(parent, look, caption, PixelRect{button_size},
-           on_character, ch, style);
+  if (look.lx)
+    b.Create(parent,
+             std::make_unique<LXKeyRenderer>(
+               *look.key_font, caption, LXKeyRenderer::Kind::CHARACTER,
+               ch == ' ' ? LXKeyRenderer::Glyph::SPACE
+               : LXKeyRenderer::Glyph::TEXT),
+             PixelRect{button_size}, on_character, ch, style);
+  else
+    b.Create(parent, look, caption, PixelRect{button_size},
+             on_character, ch, style);
+}
+
+const char *
+KeyboardWidget::GetShiftCaption() const noexcept
+{
+  if (look.lx)
+    return shift_state ? "ABC" : "abc";
+
+  return shift_state ? "v" : "^";
 }
 
 void
 KeyboardWidget::UpdateShiftState() noexcept
 {
   if (show_shift_button)
-    shift_button.SetCaption(shift_state ? "v" : "^");
+    shift_button.SetCaption(GetShiftCaption());
 
   for (unsigned i = 0; i < num_buttons; ++i) {
     unsigned uch = buttons[i].GetCharacter();
@@ -256,13 +370,13 @@ KeyboardWidget::UpdateShiftState() noexcept
       if (shift_state) {
         if (IsLowerAlphaASCII(c))
           buttons[i].SetCharacter(c - 0x20);
-        else if (show_shift_button && c == '-')
+        else if (show_shift_button && !look.lx && c == '-')
           /* '-' doubles as '_', which is otherwise not reachable */
           buttons[i].SetCharacter('_');
       } else {
         if (IsUpperAlphaASCII(c))
           buttons[i].SetCharacter(c + 0x20);
-        else if (show_shift_button && c == '_')
+        else if (show_shift_button && !look.lx && c == '_')
           buttons[i].SetCharacter('-');
       }
     }
@@ -283,8 +397,8 @@ KeyboardWidget::GetByIndex(int idx) const noexcept
 {
   if (idx >= 0 && (unsigned)idx < num_buttons)
     return &buttons[(unsigned)idx];
-  if (show_shift_button && idx == (int)num_buttons)
-    return &shift_button;
+  if (idx >= (int)num_buttons && (unsigned)idx < num_buttons + num_extra_keys)
+    return extra_keys[(unsigned)idx - num_buttons];
   return nullptr;
 }
 
@@ -301,8 +415,9 @@ KeyboardWidget::FindIndexOf(const Window *w) const noexcept
   for (unsigned i = 0; i < num_buttons; ++i)
     if (w == (const Window *)&buttons[i])
       return (int)i;
-  if (show_shift_button && w == (const Window *)&shift_button)
-    return (int)num_buttons;
+  for (unsigned i = 0; i < num_extra_keys; ++i)
+    if (w == (const Window *)extra_keys[i])
+      return (int)(num_buttons + i);
   return -1;
 }
 
@@ -397,7 +512,8 @@ KeyboardWidget::FindIndexVerticalFrom(int from_idx, int diy) const noexcept
     /* From @em Space, the key above in @em y is the Z row; the shift
        key shares that band but is not the next “up” in the QWERTY
        path (Z → A → Q → row 0). */
-    if (up_from_space && show_shift_button && j == (int)num_buttons)
+    if (up_from_space && show_shift_button &&
+        GetByIndex(j) == &shift_button)
       continue;
     PixelPoint cj;
     if (!TryNavigableKeyCenter(from_idx, j, cj))

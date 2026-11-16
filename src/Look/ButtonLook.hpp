@@ -39,6 +39,12 @@ struct ButtonLook {
   bool lx = false;
   const Font *soft_key_font = nullptr;
 
+  /** The characters on the keys of the LX on-screen keyboard. */
+  const Font *key_font = nullptr;
+
+  /** The words ("CLR") on its action keys. */
+  const Font *key_label_font = nullptr;
+
   struct {
     Color color;
     Brush brush;

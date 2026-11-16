@@ -16,6 +16,7 @@ FORM_SOURCES = \
 	$(SRC)/Renderer/GestureRenderer.cpp \
 	$(SRC)/Renderer/GradientRenderer.cpp \
 	$(SRC)/Renderer/LXFieldRenderer.cpp \
+	$(SRC)/Renderer/LXKeyRenderer.cpp \
 	$(SRC)/Renderer/LXListRenderer.cpp \
 	$(FORM_SRC_DIR)/Control.cpp \
 	$(FORM_SRC_DIR)/Panel.cpp \

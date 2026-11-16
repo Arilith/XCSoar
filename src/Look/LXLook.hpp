@@ -183,6 +183,66 @@ static constexpr Palette RED{{0xd8, 0x43, 0x30}, {0x8e, 0x26, 0x1a},
 
 } // namespace Badge
 
+/**
+ * The on-screen keyboard: a panel of 10 x 5 cells, each cell holding
+ * a key face smaller than the cell, so the touch target is larger
+ * than what is drawn.
+ */
+namespace Keyboard {
+
+static constexpr Color PANEL{0x10, 0x10, 0x10};
+
+static constexpr unsigned PANEL_WIDTH = 472;
+static constexpr unsigned PANEL_HEIGHT = 290;
+
+/** Distance between the panel and the row of soft keys below it */
+static constexpr unsigned PANEL_BOTTOM_GAP = 2;
+
+static constexpr unsigned COLUMNS = 10;
+static constexpr unsigned ROWS = 5;
+
+/** The visible face of a key, and the pitch of the cells */
+static constexpr unsigned KEY_WIDTH = 40;
+static constexpr unsigned KEY_HEIGHT = 50;
+static constexpr unsigned COLUMN_PITCH = 46;
+static constexpr unsigned ROW_PITCH = 56;
+
+static constexpr Color KEY_FILL{0x28, 0x28, 0x28};
+static constexpr Color KEY_EDGE{0x30, 0x30, 0x30};
+static constexpr Color ACTION_FILL{0x38, 0x38, 0x38};
+static constexpr Color ACTION_EDGE{0x40, 0x40, 0x40};
+
+/** The dark line around a face; white on the key with the focus */
+static constexpr Color KEY_OUTLINE{0x01, 0x01, 0x01};
+static constexpr Color FOCUS_RING = COLOR_WHITE;
+static constexpr unsigned RADIUS = 3;
+
+static constexpr Color TEXT{0xe8, 0xe8, 0xe8};
+static constexpr Color DISABLED_TEXT{0x60, 0x60, 0x60};
+
+/** Text size of the characters, and of the words on the action keys */
+static constexpr unsigned FONT = 32;
+static constexpr unsigned LABEL_FONT = 16;
+
+/** The "space" glyph: a bracket open to the top, in the disabled grey */
+static constexpr unsigned SPACE_GLYPH_WIDTH = 22;
+static constexpr unsigned SPACE_GLYPH_HEIGHT = 6;
+static constexpr unsigned SPACE_GLYPH_STROKE = 3;
+static constexpr unsigned SPACE_GLYPH_TICK = 4;
+
+/** Distance between the bottom of the face and the space glyph */
+static constexpr unsigned SPACE_GLYPH_BOTTOM_INSET = 10;
+
+/** The backspace glyph: an arrow pointing left with a cross in it */
+static constexpr unsigned BACKSPACE_GLYPH_WIDTH = 27;
+static constexpr unsigned BACKSPACE_GLYPH_HEIGHT = 18;
+
+/** The field showing the text above the keyboard */
+static constexpr unsigned EDITOR_TOP = 8;
+static constexpr unsigned EDITOR_HEIGHT = 45;
+
+} // namespace Keyboard
+
 /** Dialogs which do not fill the screen */
 namespace Dialog {
 
