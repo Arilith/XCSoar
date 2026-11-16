@@ -12543,3 +12543,6 @@ msgstr "로그인 거부됨:"
 
 msgid "LX-style glider"
 msgstr ""
+
+msgid "5 Bottom or Right"
+msgstr ""

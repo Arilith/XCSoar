@@ -16,6 +16,29 @@ ExpectSize(unsigned screen_width, unsigned screen_height,
 }
 
 static void
+TestFiveBoxLayout()
+{
+  using G = InfoBoxSettings::Geometry;
+  const auto portrait = InfoBoxLayout::Calculate(
+    PixelRect{PixelSize{600, 1024}}, G::BOTTOM_RIGHT_5);
+  ok1(portrait.count == 5);
+  ok1(portrait.control_size.width == 120);
+  ok1(portrait.control_size.height == 85);
+  ok1(portrait.remaining.bottom == 939);
+  ok1(portrait.positions[0].left == 0);
+  ok1(portrait.positions[4].right == 600);
+  ok1(portrait.positions[4].bottom == 1024);
+
+  const auto landscape = InfoBoxLayout::Calculate(
+    PixelRect{PixelSize{1024, 600}}, G::BOTTOM_RIGHT_5);
+  ok1(landscape.count == 5);
+  ok1(landscape.control_size.height == 120);
+  ok1(landscape.control_size.width == 168);
+  ok1(landscape.remaining.right == 856);
+  ok1(landscape.positions[4].bottom == 600);
+}
+
+static void
 TestVarioAnchor()
 {
   /* A status bar or cutout puts the InfoBox area below y = 0. The
@@ -46,13 +69,14 @@ TestVarioAnchor()
 int
 main()
 {
-  plan_tests(8 + 8);
+  plan_tests(8 + 8 + 12);
 
   ExpectSize(1000, 1000, 200, 200);
   ExpectSize(500, 1000, 100, 200);
   ExpectSize(2000, 1000, 280, 200);
   ExpectSize(1400, 1000, 245, 200);
   TestVarioAnchor();
+  TestFiveBoxLayout();
 
   return exit_status();
 }

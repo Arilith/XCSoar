@@ -20,6 +20,7 @@ static constexpr unsigned char geometry_counts[] = {
   12, // 3 rows X 4 boxes
   15, // 3 rows X 5 boxes
   18, // 3 rows X 6 boxes
+  5,  // one row or column
 };
 
 namespace InfoBoxLayout {
@@ -413,6 +414,15 @@ InfoBoxLayout::Calculate(PixelRect rc, InfoBoxSettings::Geometry geometry,
       rc.bottom = MakeBottomRow(layout, layout.positions, 4,
                                 rc.left, rc.right, rc.bottom);
     break;
+
+  case InfoBoxSettings::Geometry::BOTTOM_RIGHT_5:
+    if (layout.landscape)
+      rc.right = MakeRightColumn(layout, layout.positions, 5,
+                                 rc.right, rc.top, rc.bottom);
+    else
+      rc.bottom = MakeBottomRow(layout, layout.positions, 5,
+                                rc.left, rc.right, rc.bottom);
+    break;
   };
 
   layout.remaining = rc;
@@ -459,6 +469,7 @@ InfoBoxLayout::ValidateGeometry(InfoBoxSettings::Geometry geometry,
 
     case InfoBoxSettings::Geometry::TOP_LEFT_4:
     case InfoBoxSettings::Geometry::BOTTOM_RIGHT_4:
+    case InfoBoxSettings::Geometry::BOTTOM_RIGHT_5:
     case InfoBoxSettings::Geometry::OBSOLETE_TOP_LEFT_4:
     case InfoBoxSettings::Geometry::OBSOLETE_BOTTOM_RIGHT_4:
       break;
@@ -508,6 +519,7 @@ InfoBoxLayout::ValidateGeometry(InfoBoxSettings::Geometry geometry,
     case InfoBoxSettings::Geometry::BOTTOM_8_VARIO:
     case InfoBoxSettings::Geometry::TOP_LEFT_4:
     case InfoBoxSettings::Geometry::BOTTOM_RIGHT_4:
+    case InfoBoxSettings::Geometry::BOTTOM_RIGHT_5:
     case InfoBoxSettings::Geometry::OBSOLETE_TOP_LEFT_4:
     case InfoBoxSettings::Geometry::OBSOLETE_BOTTOM_RIGHT_4:
     case InfoBoxSettings::Geometry::TOP_8_VARIO:
@@ -597,6 +609,7 @@ InfoBoxLayout::CalcInfoBoxSizes(Layout &layout, PixelSize screen_size,
 
   case InfoBoxSettings::Geometry::TOP_LEFT_4:
   case InfoBoxSettings::Geometry::BOTTOM_RIGHT_4:
+  case InfoBoxSettings::Geometry::BOTTOM_RIGHT_5:
     if (landscape) {
       layout.control_size.height = screen_size.height / layout.count;
       layout.control_size.width = CalculateInfoBoxColumnWidth(screen_size.width,
@@ -800,6 +813,18 @@ InfoBoxLayout::GetBorder(InfoBoxSettings::Geometry geometry, bool landscape,
         border |= BORDERRIGHT;
     }
 
+    break;
+
+  case InfoBoxSettings::Geometry::BOTTOM_RIGHT_5:
+    if (landscape) {
+      border |= BORDERLEFT;
+      if (i < 4)
+        border |= BORDERBOTTOM;
+    } else {
+      border |= BORDERTOP;
+      if (i < 4)
+        border |= BORDERRIGHT;
+    }
     break;
 
   case InfoBoxSettings::Geometry::BOTTOM_RIGHT_10:

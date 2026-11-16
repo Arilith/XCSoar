@@ -12354,3 +12354,6 @@ msgstr "登入被拒絕:"
 
 msgid "LX-style glider"
 msgstr ""
+
+msgid "5 Bottom or Right"
+msgstr ""

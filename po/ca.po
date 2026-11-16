@@ -12942,3 +12942,6 @@ msgstr "inici de sessió rebutjat:"
 
 msgid "LX-style glider"
 msgstr ""
+
+msgid "5 Bottom or Right"
+msgstr ""

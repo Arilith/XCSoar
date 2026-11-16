@@ -12847,3 +12847,6 @@ msgstr "prihlásenie odmietnuté:"
 
 msgid "LX-style glider"
 msgstr ""
+
+msgid "5 Bottom or Right"
+msgstr ""

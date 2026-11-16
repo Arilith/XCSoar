@@ -23,6 +23,8 @@ inline constexpr StaticEnumChoice info_box_geometry_list[] = {
     N_("15 Split in 3 rows") },
   { InfoBoxSettings::Geometry::SPLIT_3X6,
     N_("18 Split in 3 rows") },
+  { InfoBoxSettings::Geometry::BOTTOM_RIGHT_5,
+    N_("5 Bottom or Right") },
   { InfoBoxSettings::Geometry::BOTTOM_RIGHT_8,
     N_("8 Bottom or Right") },
   { InfoBoxSettings::Geometry::BOTTOM_8_VARIO,
