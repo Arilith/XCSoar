@@ -24,6 +24,8 @@
 struct MapSettings;
 
 struct MapLook {
+  /** Use the LX-style compass on colour displays in dark mode. */
+  bool lx = false;
   WaypointLook waypoint;
   AirspaceLook airspace;
   AircraftLook aircraft;
@@ -73,5 +75,6 @@ struct MapLook {
   TopographyLook topography;
 
   void Initialise(const MapSettings &settings,
-                  const Font &font, const Font &bold_font);
+                  const Font &font, const Font &bold_font,
+                  bool lx = false);
 };

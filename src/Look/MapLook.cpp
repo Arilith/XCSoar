@@ -10,8 +10,9 @@
 
 void
 MapLook::Initialise(const MapSettings &settings,
-                    const Font &font, const Font &bold_font)
+                    const Font &font, const Font &bold_font, bool _lx)
 {
+  lx = _lx;
   const uint8_t alpha = ALPHA_OVERLAY;
 
   waypoint.Initialise(settings.waypoint, font, bold_font);
@@ -27,9 +28,12 @@ MapLook::Initialise(const MapSettings &settings,
 
   terrain_warning_icon.LoadResource(IDB_TERRAINWARNING_ALL);
 
-  compass_brush.Create(IsDithered() ? COLOR_WHITE : ColorWithAlpha(Color(207, 207, 207), alpha));
+  compass_brush.Create(lx ? COLOR_BLACK : IsDithered()
+                       ? COLOR_WHITE
+                       : ColorWithAlpha(Color(207, 207, 207), alpha));
   compass_pen.Create(Layout::ScalePenWidth(1),
-                     HasColors()? COLOR_GRAY : COLOR_BLACK);
+                     lx ? COLOR_WHITE
+                     : HasColors() ? COLOR_GRAY : COLOR_BLACK);
   compass_triangle_brush.Create(IsDithered()
                                 ? COLOR_BLACK
                                 : ColorWithAlpha(Color(50, 50, 50), alpha));

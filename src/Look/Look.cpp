@@ -89,7 +89,7 @@ Look::InitialiseConfigured(const UISettings &settings,
   thermal_assistant_gauge.Initialise(true, dark_mode);
   final_glide_bar.Initialise(map_bold_font);
   vario_bar.Initialise(map_bold_font);
-  map.Initialise(settings.map, map_font, map_bold_font);
+  map.Initialise(settings.map, map_font, map_bold_font, dialog.lx);
   icon.Initialise();
   circling_percent.Initialise();
 }

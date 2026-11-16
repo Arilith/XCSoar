@@ -58,6 +58,8 @@ Version 7.47 - not yet released
   - fix a long pause after the quick guide while a fine terrain
     file loads the tiles under the map
 * map
+  - draw the compass as a black arrow with a white outline in the
+    dark LX-style look
   - draw the wind arrow light blue when the wind comes from an
     external sensor, grey when XCSoar estimated it
   - draw the instantaneous wind of an external sensor (Larus) as a
@@ -107,6 +109,7 @@ Version 7.47 - not yet released
     login (wrong e-mail or password, subscription not active, too
     many devices) instead of "Loading SkySight catalog..." #2860
 * documentation
+  - describe the dark-mode compass appearance
   - describe live waypoint suggestions and completion
   - describe the LX-style keyboard cursor keys
   - describe the Configuration grid and dark-mode control feedback

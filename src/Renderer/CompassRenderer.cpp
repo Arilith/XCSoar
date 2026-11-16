@@ -57,6 +57,9 @@ CompassRenderer::Draw(Canvas &canvas, const Angle screen_angle,
                      Layout::Scale(100U));
   canvas.DrawPolygon(arrow, ARRAY_SIZE(arrow));
 
+  if (look.lx)
+    return;
+
   canvas.Select(look.compass_triangle_pen);
   canvas.Select(look.compass_triangle_brush);
 
