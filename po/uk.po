@@ -12922,3 +12922,6 @@ msgstr "забагато пристроїв використовують цей 
 
 msgid "login rejected:"
 msgstr "вхід відхилено:"
+
+msgid "LX-style glider"
+msgstr ""

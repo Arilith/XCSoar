@@ -12971,3 +12971,6 @@ msgstr "zu viele Geräte nutzen dieses Konto"
 
 msgid "login rejected:"
 msgstr "Anmeldung abgelehnt:"
+
+msgid "LX-style glider"
+msgstr ""

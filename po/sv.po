@@ -12790,3 +12790,6 @@ msgstr "för många enheter använder detta konto"
 
 msgid "login rejected:"
 msgstr "inloggning nekad:"
+
+msgid "LX-style glider"
+msgstr ""

@@ -12956,3 +12956,6 @@ msgstr "te veel apparaten gebruiken dit account"
 
 msgid "login rejected:"
 msgstr "aanmelding geweigerd:"
+
+msgid "LX-style glider"
+msgstr ""

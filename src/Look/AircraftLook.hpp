@@ -14,5 +14,7 @@ struct AircraftLook {
   Pen canopy_pen;
   Brush canopy_brush;
 
-  void Initialise();
+  bool lx = false;
+
+  void Initialise(bool lx = false);
 };

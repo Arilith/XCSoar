@@ -12840,3 +12840,6 @@ msgstr "çok fazla cihaz bu hesabı kullanıyor"
 
 msgid "login rejected:"
 msgstr "giriş reddedildi:"
+
+msgid "LX-style glider"
+msgstr ""

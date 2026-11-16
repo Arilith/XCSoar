@@ -12989,3 +12989,6 @@ msgstr "πάρα πολλές συσκευές χρησιμοποιούν αυτ
 
 msgid "login rejected:"
 msgstr "η σύνδεση απορρίφθηκε:"
+
+msgid "LX-style glider"
+msgstr ""

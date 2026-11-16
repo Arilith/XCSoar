@@ -12780,3 +12780,6 @@ msgstr "quá nhiều thiết bị sử dụng tài khoản này"
 
 msgid "login rejected:"
 msgstr "đăng nhập bị từ chối:"
+
+msgid "LX-style glider"
+msgstr ""

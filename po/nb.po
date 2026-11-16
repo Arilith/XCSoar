@@ -12783,3 +12783,6 @@ msgstr "for mange enheter bruker denne kontoen"
 
 msgid "login rejected:"
 msgstr "innlogging avvist:"
+
+msgid "LX-style glider"
+msgstr ""

@@ -16,7 +16,7 @@ MapLook::Initialise(const MapSettings &settings,
   const uint8_t alpha = ALPHA_OVERLAY;
 
   waypoint.Initialise(settings.waypoint, font, bold_font);
-  aircraft.Initialise();
+  aircraft.Initialise(lx);
   task.Initialise();
   trail.Initialise(settings.trail);
   wave.Initialise();

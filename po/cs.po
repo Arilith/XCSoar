@@ -12793,3 +12793,6 @@ msgstr "příliš mnoho zařízení používá tento účet"
 
 msgid "login rejected:"
 msgstr "přihlášení odmítnuto:"
+
+msgid "LX-style glider"
+msgstr ""

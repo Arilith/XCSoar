@@ -12835,3 +12835,6 @@ msgstr "previše uređaja koristi ovaj račun"
 
 msgid "login rejected:"
 msgstr "prijava odbijena:"
+
+msgid "LX-style glider"
+msgstr ""

@@ -12929,3 +12929,6 @@ msgstr "zbyt wiele urządzeń korzysta z tego konta"
 
 msgid "login rejected:"
 msgstr "logowanie odrzucone:"
+
+msgid "LX-style glider"
+msgstr ""

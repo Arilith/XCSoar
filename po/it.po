@@ -13010,3 +13010,6 @@ msgstr "troppi dispositivi usano questo account"
 
 msgid "login rejected:"
 msgstr "accesso rifiutato:"
+
+msgid "LX-style glider"
+msgstr ""

@@ -4,8 +4,9 @@
 #include "AircraftLook.hpp"
 
 void
-AircraftLook::Initialise()
+AircraftLook::Initialise(bool _lx)
 {
+  lx = _lx;
   // Note: No scaling needed. Pens are used with CanvasRotateShift, which
   //       applies Layout::scale.
   aircraft_pen.Create(1, COLOR_DARK_GRAY);

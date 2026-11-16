@@ -13012,3 +13012,6 @@ msgstr "demasiados dispositivos usan esta cuenta"
 
 msgid "login rejected:"
 msgstr "inicio de sesión rechazado:"
+
+msgid "LX-style glider"
+msgstr ""

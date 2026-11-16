@@ -12898,3 +12898,6 @@ msgstr "túl sok eszköz használja ezt a fiókot"
 
 msgid "login rejected:"
 msgstr "bejelentkezés elutasítva:"
+
+msgid "LX-style glider"
+msgstr ""

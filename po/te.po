@@ -12673,3 +12673,6 @@ msgstr "చాలా పరికరాలు ఈ ఖాతాను ఉపయ�
 
 msgid "login rejected:"
 msgstr "లాగిన్ తిరస్కరించబడింది:"
+
+msgid "LX-style glider"
+msgstr ""

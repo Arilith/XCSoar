@@ -12826,3 +12826,6 @@ msgstr "liian monta laitetta käyttää tätä tiliä"
 
 msgid "login rejected:"
 msgstr "kirjautuminen hylätty:"
+
+msgid "LX-style glider"
+msgstr ""

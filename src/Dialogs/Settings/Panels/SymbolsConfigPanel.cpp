@@ -101,6 +101,8 @@ static constexpr StaticEnumChoice trail_type_list[] = {
 };
 
 static constexpr StaticEnumChoice  aircraft_symbol_list[] = {
+  { AircraftSymbol::AUTO, N_("Automatic") },
+  { AircraftSymbol::LX_GLIDER, N_("LX-style glider") },
   { AircraftSymbol::SIMPLE, N_("Simple"),
     N_("Simplified line graphics, black with white contours.") },
   { AircraftSymbol::SIMPLE_LARGE, N_("Simple (large)"),

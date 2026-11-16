@@ -12815,3 +12815,6 @@ msgstr "preveč naprav uporablja ta račun"
 
 msgid "login rejected:"
 msgstr "prijava zavrnjena:"
+
+msgid "LX-style glider"
+msgstr ""

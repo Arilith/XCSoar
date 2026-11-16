@@ -5,6 +5,7 @@
 #include "RotatedPolygonRenderer.hpp"
 #include "ui/canvas/Canvas.hpp"
 #include "Look/AircraftLook.hpp"
+#include "Look/LXLook.hpp"
 #include "MapSettings.hpp"
 #include "Asset.hpp"
 #include "Math/Angle.hpp"
@@ -83,6 +84,30 @@ DrawDetailedAircraft(Canvas &canvas, bool inverse,
     canvas.Select(look.canopy_brush);
     DrawMirroredPolygon(Canopy, canvas, angle, aircraft_pos);
   }
+}
+
+static void
+DrawLXGlider(Canvas &canvas, const AircraftLook &look, const Angle angle,
+             const PixelPoint aircraft_pos) noexcept
+{
+  static constexpr BulkPixelPoint aircraft[] = {
+    {0, -13}, {-2, -10}, {-2, -4}, {-17, -4}, {-24, -3},
+    {-28, 0}, {-28, 2}, {-19, 2}, {-2, 2}, {-2, 14},
+    {-10, 17}, {-10, 19}, {0, 18}, {10, 19}, {10, 17},
+    {2, 14}, {2, 2}, {19, 2}, {28, 2}, {28, 0},
+    {24, -3}, {17, -4}, {2, -4}, {2, -10},
+  };
+  /* The LX dimensions are relative to the display, while the rotated
+     renderer also applies the configured display DPI. */
+  const unsigned scale = std::max(1u, LX::Scale(100) * 100 /
+                                  Layout::Scale(100U));
+  const RotatedPolygonRenderer renderer(aircraft, aircraft_pos, angle, scale);
+  canvas.SelectHollowBrush();
+  canvas.Select(look.aircraft_simple2_pen);
+  renderer.Draw(canvas, 0, ARRAY_SIZE(aircraft));
+  canvas.SelectBlackBrush();
+  canvas.Select(look.aircraft_simple1_pen);
+  renderer.Draw(canvas, 0, ARRAY_SIZE(aircraft));
 }
 
 
@@ -255,7 +280,19 @@ AircraftRenderer::Draw(Canvas &canvas, const MapSettings &settings_map,
 {
   const bool inverse = IsDithered() || !settings_map.terrain.enable;
 
-  switch (settings_map.aircraft_symbol) {
+  const AircraftSymbol symbol = settings_map.aircraft_symbol ==
+    AircraftSymbol::AUTO
+    ? (look.lx ? AircraftSymbol::LX_GLIDER : AircraftSymbol::SIMPLE)
+    : settings_map.aircraft_symbol;
+
+  switch (symbol) {
+  case AircraftSymbol::AUTO:
+    break;
+
+  case AircraftSymbol::LX_GLIDER:
+    DrawLXGlider(canvas, look, angle, aircraft_pos);
+    break;
+
   case AircraftSymbol::DETAILED:
     DrawDetailedAircraft(canvas, inverse,
                          look, angle, aircraft_pos);

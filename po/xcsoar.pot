@@ -11565,3 +11565,6 @@ msgstr ""
 #: src/Dialogs/Device/ManageACDDialog.cpp
 msgid "Auxiliary volume"
 msgstr ""
+
+msgid "LX-style glider"
+msgstr ""
