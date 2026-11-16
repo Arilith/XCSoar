@@ -163,6 +163,19 @@ RowFormWidget::Row::IsShareable() const noexcept
     IsShortValue(data_field->GetType());
 }
 
+bool
+RowFormWidget::Row::FitsCell(unsigned cell_width) const noexcept
+{
+  const WndProperty &control = GetControl();
+  if (!control.IsCheckBox())
+    return true;
+
+  /* a check box shows its caption right of the box */
+  const unsigned box = LX::Scale(LX::CheckBox::BOX_SIZE) +
+    LX::Scale(LX::CheckBox::PADDING) + LX::Scale(LX::CheckBox::CAPTION_GAP);
+  return control.GetRecommendedCaptionWidth() + box <= cell_width;
+}
+
 inline void
 RowFormWidget::Row::UpdateLayout(ContainerWindow &parent,
                                  const PixelRect &_position,
@@ -459,10 +472,15 @@ RowFormWidget::MakePlan(unsigned width) const noexcept
   }
 
   /* put the available rows into lines */
+  const unsigned cell_width = plan.columns > 1
+    ? (width - 2 * plan.margin - plan.gap * (plan.columns - 1)) / plan.columns
+    : width;
+
   boost::container::static_vector<bool, 32u> shareable;
   for (const auto &row : rows)
     if (row.IsAvailable(expert))
-      shareable.push_back(plan.columns > 1 && row.IsShareable());
+      shareable.push_back(plan.columns > 1 && row.IsShareable() &&
+                          row.FitsCell(cell_width));
 
   boost::container::static_vector<RowFlow::Slot, 32u> assigned(shareable.size());
   const unsigned n_lines = RowFlow::Assign(shareable, plan.columns, assigned);
@@ -478,8 +496,10 @@ RowFormWidget::MakePlan(unsigned width) const noexcept
     const RowFlow::Slot slot = *next++;
     plan.slots.push_back(slot);
 
-    /* the rows of a shared line have the caption above the value */
-    const bool caption_above = vertical || slot.span < plan.columns;
+    /* the rows of a shared line have the caption above the value,
+       and in the LX look so has a short row that is left over */
+    const bool caption_above = vertical || slot.span < plan.columns ||
+      (look.lx && row.IsShareable());
     auto &line = plan.lines[slot.line];
     line.min_height = std::max(line.min_height,
                                row.GetMinimumHeight(look, caption_above));
@@ -488,44 +508,24 @@ RowFormWidget::MakePlan(unsigned width) const noexcept
     line.elastic |= row.IsElastic(look, caption_above);
   }
 
-  /* The captions left of the values are as wide as the widest one.
-     The LX look gives the values of short rows a column of their
-     own, as wide as on the LX9000. */
-  int short_caption_width = -1, wide_caption_width = -1;
-  if (!vertical) {
-    for (std::size_t i = 0; i < rows.size(); ++i) {
-      const Row &row = rows[i];
-      if (row.type != Row::Type::EDIT || plan.slots[i].span < plan.columns ||
-          !row.IsAvailable(expert))
-        continue;
+  /* The captions left of the values are as wide as the widest one. */
+  int caption_width = -1;
+  const auto caption_left = [&](std::size_t i) {
+    return !vertical && plan.slots[i].span == plan.columns &&
+      !(look.lx && rows[i].IsShareable());
+  };
 
-      const int cw = row.GetControl().GetRecommendedCaptionWidth();
-      int &widest = look.lx && row.IsShareable()
-        ? short_caption_width
-        : wide_caption_width;
-      widest = std::max(widest, cw);
-    }
+  for (std::size_t i = 0; i < rows.size(); ++i)
+    if (rows[i].type == Row::Type::EDIT && rows[i].IsAvailable(expert) &&
+        caption_left(i))
+      caption_width = std::max<int>(caption_width,
+        rows[i].GetControl().GetRecommendedCaptionWidth());
 
-    if (short_caption_width >= 0)
-      short_caption_width = std::max<int>(short_caption_width,
-                                          int(width) - 2 * int(plan.margin)
-                                          - int(LX::Scale(LX::Form::VALUE_COLUMN_WIDTH)));
+  if (caption_width * 3 > int(width * 2))
+    caption_width = width * 2 / 3;
 
-    for (int *cw : {&short_caption_width, &wide_caption_width})
-      if (*cw * 3 > int(width * 2))
-        *cw = width * 2 / 3;
-  }
-
-  for (std::size_t i = 0; i < rows.size(); ++i) {
-    const Row &row = rows[i];
-    int cw = -1;
-    if (!vertical && plan.slots[i].span == plan.columns)
-      cw = look.lx && row.IsShareable()
-        ? short_caption_width
-        : wide_caption_width;
-
-    plan.caption_widths.push_back(cw);
-  }
+  for (std::size_t i = 0; i < rows.size(); ++i)
+    plan.caption_widths.push_back(caption_left(i) ? caption_width : -1);
 
   return plan;
 }

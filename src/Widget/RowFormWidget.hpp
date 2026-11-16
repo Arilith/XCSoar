@@ -233,6 +233,13 @@ class RowFormWidget : public WindowWidget {
     bool IsShareable() const noexcept;
 
     /**
+     * Does the row fit into a column of this width?  Only a check
+     * box can be too wide: its caption is not shortened.
+     */
+    [[gnu::pure]]
+    bool FitsCell(unsigned cell_width) const noexcept;
+
+    /**
      * Will this row grow when there is excess screen space?
      */
     bool IsElastic(const DialogLook &look, bool vertical) const noexcept {
