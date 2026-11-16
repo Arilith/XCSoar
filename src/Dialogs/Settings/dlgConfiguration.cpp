@@ -580,7 +580,9 @@ UpdateChrome(WidgetDialog &dialog, TabMenuDisplay &menu)
 {
   const char *caption = menu.GetCaption();
   if (caption == nullptr)
-    caption = _("Configuration");
+    caption = UIGlobals::GetDialogLook().lx
+      ? C_("Menu", "Setup")
+      : _("Configuration");
   dialog.SetCaption(caption);
 
   pager->SetCloseButtonCaption(pager->GetCurrentIndex() == 0 &&
@@ -668,7 +670,8 @@ void dlgConfigurationShowModal()
 
   if (initial_page != nullptr) {
     OnPageFlipped(dialog, menu);
-  }
+  } else
+    UpdateChrome(dialog, menu);
 
   /* Esc on a settings panel returns to the menu (same as Back); in a
      sub-grid it returns to the main grid; there, leave Esc to cancel
