@@ -14,10 +14,16 @@ $(eval $(call rsvg-convert,$(PNG_MARKET_ICONS),$(DATA)/graphics/%_market.png,Dat
 SVG_ICONS = $(wildcard Data/icons/*.svg)
 SVG_NOALIAS_ICONS = $(patsubst Data/icons/%.svg,$(DATA)/icons/%.svg,$(SVG_ICONS))
 
+# Optional icons that are not part of the source tree (a gitignored
+# directory); they are built like Data/icons/*.svg, and registered
+# as resources IDB_<NAME> by resources-private.txt below.
+SVG_PRIVATE_ICONS = $(wildcard Data/icons-private/*.svg)
+SVG_NOALIAS_PRIVATE_ICONS = $(patsubst Data/icons-private/%.svg,$(DATA)/icons/%.svg,$(SVG_PRIVATE_ICONS))
+
 BMP_ICONS_ALL =
 
 define generate-icon-scale
-PNG_ICONS_$(1) = $$(patsubst Data/icons/%.svg,$$(DATA)/icons/%_$(1).png,$$(SVG_ICONS))
+PNG_ICONS_$(1) = $$(patsubst Data/icons/%.svg,$$(DATA)/icons/%_$(1).png,$$(SVG_ICONS)) $$(patsubst Data/icons-private/%.svg,$$(DATA)/icons/%_$(1).png,$$(SVG_PRIVATE_ICONS))
 BMP_ICONS_$(1) = $$(PNG_ICONS_$(1):.png=.bmp)
 BMP_ICONS_ALL += $$(BMP_ICONS_$(1))
 $$(eval $$(call rsvg-convert,$$(PNG_ICONS_$(1)),$$(DATA)/icons/%_$(1).png,$$(DATA)/icons/%.svg,--x-zoom=$2 --y-zoom=$2))
@@ -63,6 +69,10 @@ PNG_ICONS_ALL = $(PNG_ICONS_ldpi) $(PNG_ICONS_mdpi) \
 
 # modify working copy of SVG to improve rendering
 $(SVG_NOALIAS_ICONS): $(DATA)/icons/%.svg: build/svg_preprocess.xsl Data/icons/%.svg | $(DATA)/icons/dirstamp
+	@$(NQ)echo "  XSLT    $@"
+	$(Q)xsltproc --nonet --stringparam DisableAA_Select "MASK_NOAA_" --output $@ $^
+
+$(SVG_NOALIAS_PRIVATE_ICONS): $(DATA)/icons/%.svg: build/svg_preprocess.xsl Data/icons-private/%.svg | $(DATA)/icons/dirstamp
 	@$(NQ)echo "  XSLT    $@"
 	$(Q)xsltproc --nonet --stringparam DisableAA_Select "MASK_NOAA_" --output $@ $^
 
@@ -283,9 +293,23 @@ $(RESOURCE_FLAGS_STAMP): FORCE | $(TARGET_OUTPUT_DIR)/dirstamp
 			mv $@.$(RANDOM_NUMBER).tmp $@; \
 	fi
 
-$(TARGET_OUTPUT_DIR)/resources.txt: Data/resources.txt $(RESOURCE_FLAGS_STAMP) | $(TARGET_OUTPUT_DIR)/dirstamp $(BUILD_TOOLCHAIN_TARGET)
+# One resource per private icon; empty without Data/icons-private.
+# Rewritten only when the list changes, so a missing directory is noticed.
+PRIVATE_RESOURCES_TXT = $(TARGET_OUTPUT_DIR)/resources-private.txt
+$(PRIVATE_RESOURCES_TXT): FORCE | $(TARGET_OUTPUT_DIR)/dirstamp
+	@for f in $(SVG_PRIVATE_ICONS); do \
+		n=$$(basename $$f .svg); \
+		echo "bitmap_icon_scaled IDB_$$(echo $$n | tr a-z A-Z) \"$$n\""; \
+	done > $@.$(RANDOM_NUMBER).tmp; \
+	if cmp -s $@.$(RANDOM_NUMBER).tmp $@; then \
+		mv -f $@.$(RANDOM_NUMBER).tmp $@.unchanged; \
+	else \
+		mv $@.$(RANDOM_NUMBER).tmp $@; \
+	fi
+
+$(TARGET_OUTPUT_DIR)/resources.txt: Data/resources.txt $(PRIVATE_RESOURCES_TXT) $(RESOURCE_FLAGS_STAMP) | $(TARGET_OUTPUT_DIR)/dirstamp $(BUILD_TOOLCHAIN_TARGET)
 	@$(NQ)echo "  CPP     $@"
-	$(Q)cat $< |$(CC) -E -o $@.$(RANDOM_NUMBER).tmp -I$(OUT)/include $(TARGET_CPPFLAGS) $(OPENGL_CPPFLAGS) -
+	$(Q)cat $< $(PRIVATE_RESOURCES_TXT) |$(CC) -E -o $@.$(RANDOM_NUMBER).tmp -I$(OUT)/include $(TARGET_CPPFLAGS) $(OPENGL_CPPFLAGS) -
 	$(Q)mv $@.$(RANDOM_NUMBER).tmp $@
 
 RANDOM_NUMBER := $(shell od -vAn -N4 -tu4 < /dev/urandom| tr -d ' ')

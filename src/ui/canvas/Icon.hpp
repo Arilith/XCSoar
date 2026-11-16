@@ -56,6 +56,15 @@ public:
                     ResourceId xxhdpi_id = ResourceId::Null(),
                     bool center=true);
 
+  /**
+   * The artwork carries its own colours (even if they are grey), so
+   * Draw() never inverts it for dark backgrounds.  Call after
+   * LoadResource().
+   */
+  void KeepColours() noexcept {
+    has_colors = true;
+  }
+
   void Reset() noexcept {
     bitmap.Reset();
   }

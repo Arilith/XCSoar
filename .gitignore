@@ -41,3 +41,7 @@ build/local-config.mk
 compile_commands.json
 messages.mo
 po/*.mo
+
+# private LX build assets
+/tools-private/
+/Data/icons-private/
